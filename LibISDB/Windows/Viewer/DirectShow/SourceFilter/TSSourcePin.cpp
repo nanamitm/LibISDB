@@ -42,8 +42,8 @@ static constexpr size_t SAMPLE_BUFFER_SIZE = TS_PACKET_SIZE * SAMPLE_PACKETS;
 
 
 
-TSSourcePin::TSSourcePin(HRESULT *phr, TSSourceFilter *pFilter)
-	: CBaseOutputPin(TEXT("TSSourcePin"), pFilter, pFilter->m_pLock, phr, L"TS")
+TSSourcePin::TSSourcePin(HRESULT *phr, TSSourceFilter *pFilter, LPCWSTR pszPinName)
+	: CBaseOutputPin(TEXT("TSSourcePin"), pFilter, pFilter->m_pLock, phr, pszPinName)
 	, m_pFilter(pFilter)
 	, m_InitialPoolPercentage(0)
 	, m_Buffering(false)
@@ -270,6 +270,18 @@ bool TSSourcePin::MapAudioPID(uint16_t AudioPID, uint16_t MapPID)
 {
 	m_SrcStream.MapAudioPID(AudioPID, MapPID);
 	return true;
+}
+
+
+void TSSourcePin::SetExcludeVideo(bool Enable)
+{
+	m_SrcStream.SetExcludeVideo(Enable);
+}
+
+
+void TSSourcePin::SetExcludeAudio(bool Enable)
+{
+	m_SrcStream.SetExcludeAudio(Enable);
 }
 
 

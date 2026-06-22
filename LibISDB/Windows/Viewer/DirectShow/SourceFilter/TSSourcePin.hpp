@@ -45,7 +45,7 @@ namespace LibISDB::DirectShow
 		, protected StreamingThread
 	{
 	public:
-		TSSourcePin(HRESULT *phr, TSSourceFilter *pFilter);
+		TSSourcePin(HRESULT *phr, TSSourceFilter *pFilter, LPCWSTR pszPinName = L"TS");
 		~TSSourcePin();
 
 	// CBasePin
@@ -73,6 +73,8 @@ namespace LibISDB::DirectShow
 		int GetBufferFillPercentage();
 		bool SetInputWait(DWORD Wait);
 		bool MapAudioPID(uint16_t AudioPID, uint16_t MapPID);
+		void SetExcludeVideo(bool Enable);
+		void SetExcludeAudio(bool Enable);
 
 	protected:
 	// Thread

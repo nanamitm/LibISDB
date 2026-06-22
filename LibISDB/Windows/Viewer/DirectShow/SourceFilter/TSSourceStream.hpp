@@ -63,6 +63,8 @@ namespace LibISDB::DirectShow
 		void SetVideoPID(uint16_t PID);
 		void SetAudioPID(uint16_t PID);
 		void MapAudioPID(uint16_t AudioPID, uint16_t MapPID);
+		void SetExcludeVideo(bool Enable);
+		void SetExcludeAudio(bool Enable);
 		long long GetPTSDuration() const noexcept { return m_PTSDuration; }
 
 	private:
@@ -85,6 +87,8 @@ namespace LibISDB::DirectShow
 
 		size_t m_QueueSize;
 		size_t m_PoolSize;
+		bool m_ExcludeVideo;
+		bool m_ExcludeAudio;
 		bool m_EnableSync;
 		bool m_SyncFor1Seg;
 		long long m_VideoPTS;

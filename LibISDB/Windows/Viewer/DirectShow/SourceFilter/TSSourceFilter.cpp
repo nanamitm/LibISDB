@@ -38,12 +38,17 @@ namespace LibISDB::DirectShow
 TSSourceFilter::TSSourceFilter(LPUNKNOWN pUnk, HRESULT *phr)
 	: CBaseFilter(TEXT("TS Source Filter"), pUnk, &m_cStateLock, __uuidof(TSSourceFilter))
 	, m_pSrcPin(nullptr)
+	, m_pAudioSrcPin(nullptr)
 	, m_OutputWhenPaused(false)
 {
 	LIBISDB_TRACE(LIBISDB_STR("TSSourceFilter::TSSourceFilter {}\n"), static_cast<void *>(this));
 
 	// ピンのインスタンス生成
-	m_pSrcPin = new TSSourcePin(phr, this);
+	m_pSrcPin = new TSSourcePin(phr, this, L"TS");
+	// 音声専用ピン。メインピン側のキューには音声を重複して積まない。
+	m_pSrcPin->SetExcludeAudio(true);
+	m_pAudioSrcPin = new TSSourcePin(phr, this, L"Audio");
+	m_pAudioSrcPin->SetExcludeVideo(true);
 
 	*phr = S_OK;
 }
@@ -51,6 +56,7 @@ TSSourceFilter::TSSourceFilter(LPUNKNOWN pUnk, HRESULT *phr)
 
 TSSourceFilter::~TSSourceFilter()
 {
+	delete m_pAudioSrcPin;
 	delete m_pSrcPin;
 }
 
@@ -78,14 +84,18 @@ IBaseFilter * WINAPI TSSourceFilter::CreateInstance(LPUNKNOWN pUnk, HRESULT *phr
 int TSSourceFilter::GetPinCount()
 {
 	// ピン数を返す
-	return 1;
+	return 2;
 }
 
 
 CBasePin * TSSourceFilter::GetPin(int n)
 {
 	// ピンのインスタンスを返す
-	return (n == 0) ? m_pSrcPin : nullptr;
+	switch (n) {
+	case 0: return m_pSrcPin;
+	case 1: return m_pAudioSrcPin;
+	}
+	return nullptr;
 }
 
 
@@ -138,7 +148,10 @@ bool TSSourceFilter::InputMedia(DataBuffer *pData)
 		}
 	}
 
-	return m_pSrcPin->InputData(pData);
+	const bool Result = m_pSrcPin->InputData(pData);
+	if (m_pAudioSrcPin)
+		m_pAudioSrcPin->InputData(pData);
+	return Result;
 }
 
 
@@ -146,6 +159,8 @@ void TSSourceFilter::Reset()
 {
 	if (m_pSrcPin)
 		m_pSrcPin->Reset();
+	if (m_pAudioSrcPin)
+		m_pAudioSrcPin->Reset();
 }
 
 
@@ -155,6 +170,8 @@ void TSSourceFilter::Flush()
 
 	if (m_pSrcPin)
 		m_pSrcPin->Flush();
+	if (m_pAudioSrcPin)
+		m_pAudioSrcPin->Flush();
 }
 
 
@@ -184,7 +201,9 @@ void TSSourceFilter::SetVideoPID(uint16_t PID)
 void TSSourceFilter::SetAudioPID(uint16_t PID)
 {
 	if (m_pSrcPin)
-		return m_pSrcPin->SetAudioPID(PID);
+		m_pSrcPin->SetAudioPID(PID);
+	if (m_pAudioSrcPin)
+		m_pAudioSrcPin->SetAudioPID(PID);
 }
 
 
@@ -230,9 +249,12 @@ bool TSSourceFilter::SetInputWait(DWORD Wait)
 
 bool TSSourceFilter::MapAudioPID(uint16_t AudioPID, uint16_t MapPID)
 {
+	bool Result = false;
 	if (m_pSrcPin)
-		return m_pSrcPin->MapAudioPID(AudioPID, MapPID);
-	return false;
+		Result = m_pSrcPin->MapAudioPID(AudioPID, MapPID);
+	if (m_pAudioSrcPin)
+		m_pAudioSrcPin->MapAudioPID(AudioPID, MapPID);
+	return Result;
 }
 
 

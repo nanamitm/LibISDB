@@ -72,12 +72,16 @@ namespace LibISDB::DirectShow
 		int GetBufferFillPercentage() const;
 		bool SetInputWait(DWORD Wait);
 		bool MapAudioPID(uint16_t AudioPID, uint16_t MapPID);
+		TSSourcePin * GetAudioPin() const noexcept { return m_pAudioSrcPin; }
 
 	protected:
 		TSSourceFilter(LPUNKNOWN pUnk, HRESULT *phr);
 		virtual ~TSSourceFilter();
 
 		TSSourcePin *m_pSrcPin;
+		// 音声専用の出力ピン。映像の大きなアクセスユニットによる背圧から音声配送を
+		// 分離するために、メインの TS 出力ピンとは別のキュー・スレッドを持つ。
+		TSSourcePin *m_pAudioSrcPin;
 		CCritSec m_cStateLock;
 		bool m_OutputWhenPaused;
 	};

@@ -383,6 +383,7 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 	HRESULT hr = S_OK;
 
 	COMPointer<IPin> OutputPin;
+	COMPointer<IPin> OutputAudioSrcPin;
 	COMPointer<IPin> OutputVideoPin;
 	COMPointer<IPin> OutputAudioPin;
 
@@ -412,6 +413,11 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 			OutputPin.Attach(DirectShow::GetFilterPin(m_SourceFilter.Get(), PINDIR_OUTPUT));
 			if (!OutputPin)
 				throw ErrorDescription(HRESULTErrorCode(E_UNEXPECTED), LIBISDB_STR("ソースフィルタの出力ピンを取得できません。"));
+			// 音声専用の出力ピンを取得(巨大な映像アクセスユニットによる背圧から
+			// 音声配送経路を分離するために、メインの出力ピンとは別系統で扱う)
+			hr = m_SourceFilter->FindPin(L"Audio", OutputAudioSrcPin.GetPP());
+			if (FAILED(hr) || !OutputAudioSrcPin)
+				throw ErrorDescription(HRESULTErrorCode(E_UNEXPECTED), LIBISDB_STR("ソースフィルタの音声専用出力ピンを取得できません。"));
 			m_SourceFilter->EnableSync(m_EnablePTSSync, m_1SegMode);
 			if (m_BufferSize != 0)
 				m_SourceFilter->SetBufferSize(m_BufferSize);
@@ -461,6 +467,46 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 					throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("MPEG-2 Demultiplexerの映像出力ピンを作成できません。"));
 				}
 			}
+			pMpeg2Demuxer->Release();
+			if (OutputVideoPin) {
+				// 映像出力ピンのIMPEG2PIDMapインタフェースのクエリー
+				hr = OutputVideoPin.QueryInterface(&m_MPEG2DemuxerVideoMap);
+				if (FAILED(hr))
+					throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("映像出力ピンのIMPEG2PIDMapを取得できません。"));
+			}
+		}
+
+		Log(Logger::LogType::Information, LIBISDB_STR("音声用MPEG-2 Demultiplexerフィルタの接続中..."));
+
+		// 音声専用の MPEG-2 Demultiplexer
+		// 映像と同じデマルチプレクサ・同じTS入力ピンを共有すると、巨大な映像アクセス
+		// ユニットの処理待ちでデマルチプレクサの入力読み出しがブロックされた際に、
+		// すぐ後ろにある音声データの配送まで止まってしまう。音声だけを別の
+		// TSSourceFilter出力ピン(InputMediaで同時に供給される)経由で、別インスタンス
+		// のデマルチプレクサに渡すことで、映像側の背圧から独立させる。
+		{
+			hr = ::CoCreateInstance(
+				CLSID_MPEG2Demultiplexer, nullptr, CLSCTX_INPROC_SERVER,
+				IID_PPV_ARGS(m_AudioDemuxerFilter.GetPP()));
+			if (FAILED(hr)) {
+				throw ErrorDescription(
+					HRESULTErrorCode(hr),
+					LIBISDB_STR("音声用のMPEG-2 Demultiplexerフィルタを作成できません。"),
+					LIBISDB_STR("MPEG-2 Demultiplexerフィルタがインストールされているか確認してください。"));
+			}
+			hr = DirectShow::AppendFilterAndConnect(
+				m_GraphBuilder.Get(), m_AudioDemuxerFilter.Get(), L"AudioMPEG2Demultiplexer", &OutputAudioSrcPin);
+			if (FAILED(hr))
+				throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("音声用のMPEG-2 Demultiplexerをフィルタグラフに追加できません。"));
+
+			// IMpeg2Demultiplexerインタフェースのクエリー
+			IMpeg2Demultiplexer *pMpeg2AudioDemuxer;
+			hr = m_AudioDemuxerFilter.QueryInterface(&pMpeg2AudioDemuxer);
+			if (FAILED(hr)) {
+				throw ErrorDescription(
+					HRESULTErrorCode(hr),
+					LIBISDB_STR("音声用のMPEG-2 Demultiplexerインターフェースを取得できません。"));
+			}
 
 			// 音声メディアフォーマット設定
 			CMediaType MediaTypeAudio;
@@ -473,16 +519,10 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 			MediaTypeAudio.SetFormatType(&FORMAT_None);
 			// 音声出力ピン作成
 			WCHAR szName[] = L"Audio";
-			hr = pMpeg2Demuxer->CreateOutputPin(&MediaTypeAudio, szName, OutputAudioPin.GetPP());
-			pMpeg2Demuxer->Release();
+			hr = pMpeg2AudioDemuxer->CreateOutputPin(&MediaTypeAudio, szName, OutputAudioPin.GetPP());
+			pMpeg2AudioDemuxer->Release();
 			if (FAILED(hr))
-				throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("MPEG-2 Demultiplexerの音声出力ピンを作成できません。"));
-			if (OutputVideoPin) {
-				// 映像出力ピンのIMPEG2PIDMapインタフェースのクエリー
-				hr = OutputVideoPin.QueryInterface(&m_MPEG2DemuxerVideoMap);
-				if (FAILED(hr))
-					throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("映像出力ピンのIMPEG2PIDMapを取得できません。"));
-			}
+				throw ErrorDescription(HRESULTErrorCode(hr), LIBISDB_STR("音声用のMPEG-2 Demultiplexerの音声出力ピンを作成できません。"));
 			// 音声出力ピンのIMPEG2PIDMapインタフェースのクエリ
 			hr = OutputAudioPin.QueryInterface(&m_MPEG2DemuxerAudioMap);
 			if (FAILED(hr))
@@ -857,6 +897,7 @@ void ViewerFilter::CloseViewer()
 	m_MPEG2DemuxerAudioMap.Release();
 	m_MPEG2DemuxerVideoMap.Release();
 	m_MPEG2DemuxerFilter.Release();
+	m_AudioDemuxerFilter.Release();
 	m_MapAudioPID = PID_INVALID;
 
 	if (m_GraphBuilder) {
@@ -1467,6 +1508,12 @@ bool ViewerFilter::SetClipToDevice(bool Clip)
 COMPointer<IBaseFilter> ViewerFilter::GetVideoDecoderFilter() const
 {
 	return m_VideoDecoderFilter;
+}
+
+
+COMPointer<IBaseFilter> ViewerFilter::GetAudioRendererFilter() const
+{
+	return m_AudioRenderer;
 }
 
 

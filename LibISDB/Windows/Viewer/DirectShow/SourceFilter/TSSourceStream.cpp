@@ -83,6 +83,8 @@ inline long long GetPacketPTS(const TSPacket *pPacket)
 TSSourceStream::TSSourceStream()
 	: m_QueueSize(DEFAULT_QUEUE_SIZE)
 	, m_PoolSize(DEFAULT_POOL_SIZE)
+	, m_ExcludeVideo(false)
+	, m_ExcludeAudio(false)
 	, m_EnableSync(false)
 	, m_SyncFor1Seg(false)
 	, m_VideoPID(PID_INVALID)
@@ -115,6 +117,33 @@ bool TSSourceStream::InputData(DataBuffer *pData)
 
 	TSPacket *pPacket = static_cast<TSPacket *>(pData);
 	const uint16_t PID = pPacket->GetPID();
+
+	// 音声専用ピンでは、映像 PID 以外(PAT/PMT/PCR/音声など)をそのまま素通しする。
+	// PAT/PMT/PCR も含めて渡すのは、音声だけを切り出すと専用デマルチプレクサが
+	// ストリームを認識できない場合があるため。映像の巨大なアクセスユニットだけを
+	// 取り除けば、音声配送経路を映像側の背圧から十分に分離できる。
+	if (m_ExcludeVideo) {
+		// TODO: 実験用の暫定除外リスト。データカルーセル/EIT/字幕/もう一系統の音声が
+		// 音声専用ピンの揺れの原因かどうかを検証するための一時的なハードコード。
+		static constexpr uint16_t DebugExcludePIDs[] = {
+			0x8000, // MH-EIT
+			0xF130, 0xF138, // Closed Caption
+			0xF140, 0xF150, 0xF160, 0xF161, 0xF162, 0xF170, 0xF171, 0xF172, // Application
+		};
+		for (uint16_t ExcludePID : DebugExcludePIDs) {
+			if (PID == ExcludePID)
+				return true;
+		}
+		if (PID != m_VideoPID)
+			AddData(pData);
+		return true;
+	}
+
+	// 音声専用ピンへ切り出した分を、こちら側のキューには重複して積まない。
+	if (m_ExcludeAudio && (PID == m_AudioPID)) {
+		return true;
+	}
+
 	if (PID != m_VideoPID && PID != m_AudioPID) {
 		if (PID != m_MapAudioPID)
 			AddData(pData);
@@ -408,6 +437,22 @@ void TSSourceStream::SetAudioPID(uint16_t PID)
 
 	m_AudioPID = PID;
 	m_MapAudioPID = PID_INVALID;
+}
+
+
+void TSSourceStream::SetExcludeVideo(bool Enable)
+{
+	BlockLock Lock(m_Lock);
+
+	m_ExcludeVideo = Enable;
+}
+
+
+void TSSourceStream::SetExcludeAudio(bool Enable)
+{
+	BlockLock Lock(m_Lock);
+
+	m_ExcludeAudio = Enable;
 }
 
 

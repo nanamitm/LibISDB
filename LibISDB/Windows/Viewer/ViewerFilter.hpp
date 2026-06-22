@@ -178,6 +178,7 @@ namespace LibISDB
 		bool SetClipToDevice(bool Clip);
 
 		COMPointer<IBaseFilter> GetVideoDecoderFilter() const;
+		COMPointer<IBaseFilter> GetAudioRendererFilter() const;
 		void SetVideoDecoderSettings(const DirectShow::KnownDecoderManager::VideoDecoderSettings &Settings);
 		bool GetVideoDecoderSettings(DirectShow::KnownDecoderManager::VideoDecoderSettings *pSettings) const;
 		void SaveVideoDecoderSettings();
@@ -273,11 +274,16 @@ namespace LibISDB
 		COMPointer<IBaseFilter> m_VideoParserFilter;
 		DirectShow::VideoParser *m_pVideoParser;
 
-		// MPEG2Demultiplexerインタフェース
+		// MPEG2Demultiplexerインタフェース(映像用。TSSourceFilterのメインピンに接続)
 		COMPointer<IBaseFilter> m_MPEG2DemuxerFilter;
+		// 音声専用のMPEG2Demultiplexer(TSSourceFilterの音声専用ピンに接続)。
+		// 巨大な映像アクセスユニットによる背圧から音声の配送経路を分離するために、
+		// 映像側とは別のデマルチプレクサ・別スレッドで処理する。
+		COMPointer<IBaseFilter> m_AudioDemuxerFilter;
 
 		// PIDマップ
 		COMPointer<IMPEG2PIDMap> m_MPEG2DemuxerVideoMap;
+		// m_AudioDemuxerFilter側のPIDマップ
 		COMPointer<IMPEG2PIDMap> m_MPEG2DemuxerAudioMap;
 
 		std::unique_ptr<DirectShow::ImageMixer> m_ImageMixer;
