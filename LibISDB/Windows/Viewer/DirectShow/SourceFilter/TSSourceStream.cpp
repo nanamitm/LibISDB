@@ -90,6 +90,8 @@ TSSourceStream::TSSourceStream()
 	, m_VideoPID(PID_INVALID)
 	, m_AudioPID(PID_INVALID)
 	, m_MapAudioPID(PID_INVALID)
+	, m_PMTPID(PID_INVALID)
+	, m_PCRPID(PID_INVALID)
 {
 	Reset();
 }
@@ -118,23 +120,14 @@ bool TSSourceStream::InputData(DataBuffer *pData)
 	TSPacket *pPacket = static_cast<TSPacket *>(pData);
 	const uint16_t PID = pPacket->GetPID();
 
-	// 音声専用ピンでは、映像 PID 以外(PAT/PMT/PCR/音声など)をそのまま素通しする。
-	// PAT/PMT/PCR も含めて渡すのは、音声だけを切り出すと専用デマルチプレクサが
-	// ストリームを認識できない場合があるため。映像の巨大なアクセスユニットだけを
-	// 取り除けば、音声配送経路を映像側の背圧から十分に分離できる。
+	// 音声専用ピンでは、PAT・PMT・PCR・音声 PID のみを通す厳密な許可リストとする。
+	// 検証の結果、映像 PID 以外を単純にすべて素通しすると、EIT・データカルーセル・
+	// 字幕などの低頻度だがバースト性のある PID が音声専用デマルチプレクサのキュー
+	// に混ざり込み、新たな揺れの原因になることが分かった。一方、音声デマルチプレクサ
+	// が PID マッピングだけでストリームを認識するには PAT/PMT/PCR 相当のコンテキスト
+	// が必要だったため、その3つと音声 PID だけを許可する。
 	if (m_ExcludeVideo) {
-		// TODO: 実験用の暫定除外リスト。データカルーセル/EIT/字幕/もう一系統の音声が
-		// 音声専用ピンの揺れの原因かどうかを検証するための一時的なハードコード。
-		static constexpr uint16_t DebugExcludePIDs[] = {
-			0x8000, // MH-EIT
-			0xF130, 0xF138, // Closed Caption
-			0xF140, 0xF150, 0xF160, 0xF161, 0xF162, 0xF170, 0xF171, 0xF172, // Application
-		};
-		for (uint16_t ExcludePID : DebugExcludePIDs) {
-			if (PID == ExcludePID)
-				return true;
-		}
-		if (PID != m_VideoPID)
+		if ((PID == PID_PAT) || (PID == m_PMTPID) || (PID == m_PCRPID) || (PID == m_AudioPID))
 			AddData(pData);
 		return true;
 	}
@@ -437,6 +430,22 @@ void TSSourceStream::SetAudioPID(uint16_t PID)
 
 	m_AudioPID = PID;
 	m_MapAudioPID = PID_INVALID;
+}
+
+
+void TSSourceStream::SetPMTPID(uint16_t PID)
+{
+	BlockLock Lock(m_Lock);
+
+	m_PMTPID = PID;
+}
+
+
+void TSSourceStream::SetPCRPID(uint16_t PID)
+{
+	BlockLock Lock(m_Lock);
+
+	m_PCRPID = PID;
 }
 
 

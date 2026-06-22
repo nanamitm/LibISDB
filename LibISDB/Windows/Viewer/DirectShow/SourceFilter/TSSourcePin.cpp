@@ -279,6 +279,18 @@ void TSSourcePin::SetExcludeVideo(bool Enable)
 }
 
 
+void TSSourcePin::SetPMTPID(uint16_t PID)
+{
+	m_SrcStream.SetPMTPID(PID);
+}
+
+
+void TSSourcePin::SetPCRPID(uint16_t PID)
+{
+	m_SrcStream.SetPCRPID(PID);
+}
+
+
 void TSSourcePin::SetExcludeAudio(bool Enable)
 {
 	m_SrcStream.SetExcludeAudio(Enable);

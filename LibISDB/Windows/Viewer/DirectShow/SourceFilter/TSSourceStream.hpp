@@ -65,6 +65,8 @@ namespace LibISDB::DirectShow
 		void MapAudioPID(uint16_t AudioPID, uint16_t MapPID);
 		void SetExcludeVideo(bool Enable);
 		void SetExcludeAudio(bool Enable);
+		void SetPMTPID(uint16_t PID);
+		void SetPCRPID(uint16_t PID);
 		long long GetPTSDuration() const noexcept { return m_PTSDuration; }
 
 	private:
@@ -99,6 +101,9 @@ namespace LibISDB::DirectShow
 		uint16_t m_VideoPID;
 		uint16_t m_AudioPID;
 		uint16_t m_MapAudioPID;
+		// 音声専用ピン(m_ExcludeVideo)で、音声 PID と共に許可する PMT・PCR の PID
+		uint16_t m_PMTPID;
+		uint16_t m_PCRPID;
 	};
 
 } // namespace LibISDB::DirectShow

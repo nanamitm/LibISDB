@@ -66,6 +66,7 @@ namespace LibISDB
 
 	protected:
 		void OnFilterRegistered(FilterBase *pFilter, FilterGraph::IDType ID) override;
+		void OnPMTUpdated(AnalyzerFilter *pAnalyzer, uint16_t ServiceID) override;
 		void OnServiceChanged(uint16_t ServiceID) override;
 		void OnVideoStreamTypeChanged(uint8_t StreamType) override;
 		void OnAudioStreamTypeChanged(uint8_t StreamType) override;

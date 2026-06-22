@@ -247,6 +247,20 @@ bool TSSourceFilter::SetInputWait(DWORD Wait)
 }
 
 
+void TSSourceFilter::SetAudioPinPMTPID(uint16_t PID)
+{
+	if (m_pAudioSrcPin)
+		m_pAudioSrcPin->SetPMTPID(PID);
+}
+
+
+void TSSourceFilter::SetAudioPinPCRPID(uint16_t PID)
+{
+	if (m_pAudioSrcPin)
+		m_pAudioSrcPin->SetPCRPID(PID);
+}
+
+
 bool TSSourceFilter::MapAudioPID(uint16_t AudioPID, uint16_t MapPID)
 {
 	bool Result = false;

@@ -73,6 +73,9 @@ namespace LibISDB::DirectShow
 		bool SetInputWait(DWORD Wait);
 		bool MapAudioPID(uint16_t AudioPID, uint16_t MapPID);
 		TSSourcePin * GetAudioPin() const noexcept { return m_pAudioSrcPin; }
+		// 音声専用ピンが PAT/音声PID と共に通す PMT・PCR の PID を設定する
+		void SetAudioPinPMTPID(uint16_t PID);
+		void SetAudioPinPCRPID(uint16_t PID);
 
 	protected:
 		TSSourceFilter(LPUNKNOWN pUnk, HRESULT *phr);

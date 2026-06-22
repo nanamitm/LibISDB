@@ -75,6 +75,8 @@ namespace LibISDB::DirectShow
 		bool MapAudioPID(uint16_t AudioPID, uint16_t MapPID);
 		void SetExcludeVideo(bool Enable);
 		void SetExcludeAudio(bool Enable);
+		void SetPMTPID(uint16_t PID);
+		void SetPCRPID(uint16_t PID);
 
 	protected:
 	// Thread

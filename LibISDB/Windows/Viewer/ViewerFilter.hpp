@@ -236,6 +236,9 @@ namespace LibISDB
 		bool SetInitialPoolPercentage(int Percentage);
 		int GetBufferFillPercentage() const;
 		bool SetPacketInputWait(DWORD Wait);
+		// 音声専用ピン(TSSourceFilter)が音声PIDと共に通すPMT・PCRのPIDを設定する。
+		// AnalyzerFilterから取得したサービスのPMT PID・PCR PIDをエンジン側から渡す。
+		bool SetServicePIDInfo(uint16_t PMTPID, uint16_t PCRPID);
 
 	protected:
 		bool AdjustVideoPosition();
@@ -318,6 +321,8 @@ namespace LibISDB
 		size_t m_BufferSize;
 		int m_InitialPoolPercentage;
 		DWORD m_PacketInputWait;
+		uint16_t m_ServicePMTPID;
+		uint16_t m_ServicePCRPID;
 		EventListenerList<EventListener> m_EventListenerList;
 		DirectShow::VideoParser::StreamCallback *m_pVideoStreamCallback;
 		DirectShow::AudioDecoderFilter::SampleCallback *m_pAudioSampleCallback;

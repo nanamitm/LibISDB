@@ -288,6 +288,22 @@ void ViewerEngine::OnFilterRegistered(FilterBase *pFilter, FilterGraph::IDType I
 }
 
 
+void ViewerEngine::OnPMTUpdated(AnalyzerFilter *pAnalyzer, uint16_t ServiceID)
+{
+	TSEngine::OnPMTUpdated(pAnalyzer, ServiceID);
+
+	// 視聴中のサービスのPMT・PCRのPIDを、音声専用ピンの許可リストに反映する。
+	// (TSSourceFilterの音声専用ピンは、巨大な映像アクセスユニットによる背圧から
+	// 音声配送経路を分離するためにPAT/PMT/PCR/音声PIDのみを通すようにしている)
+	if ((m_pViewer != nullptr) && (pAnalyzer != nullptr) && (ServiceID == GetServiceID())) {
+		AnalyzerFilter::ServiceInfo Info;
+		if (pAnalyzer->GetServiceInfoByID(ServiceID, &Info)) {
+			m_pViewer->SetServicePIDInfo(Info.PMTPID, Info.PCRPID);
+		}
+	}
+}
+
+
 void ViewerEngine::OnServiceChanged(uint16_t ServiceID)
 {
 	if ((m_pViewer != nullptr) && (m_pAnalyzer != nullptr)) {

@@ -227,6 +227,8 @@ ViewerFilter::ViewerFilter() noexcept
 	, m_BufferSize(0)
 	, m_InitialPoolPercentage(0)
 	, m_PacketInputWait(0)
+	, m_ServicePMTPID(PID_INVALID)
+	, m_ServicePCRPID(PID_INVALID)
 	, m_pVideoStreamCallback(nullptr)
 	, m_pAudioSampleCallback(nullptr)
 {
@@ -423,6 +425,8 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 				m_SourceFilter->SetBufferSize(m_BufferSize);
 			m_SourceFilter->SetInitialPoolPercentage(m_InitialPoolPercentage);
 			m_SourceFilter->SetInputWait(m_PacketInputWait);
+			m_SourceFilter->SetAudioPinPMTPID(m_ServicePMTPID);
+			m_SourceFilter->SetAudioPinPCRPID(m_ServicePCRPID);
 		}
 
 		Log(Logger::LogType::Information, LIBISDB_STR("MPEG-2 Demultiplexerフィルタの接続中..."));
@@ -1987,6 +1991,22 @@ bool ViewerFilter::SetBufferSize(size_t Size)
 	}
 
 	m_BufferSize = Size;
+
+	return true;
+}
+
+
+bool ViewerFilter::SetServicePIDInfo(uint16_t PMTPID, uint16_t PCRPID)
+{
+	LIBISDB_TRACE(LIBISDB_STR("ViewerFilter::SetServicePIDInfo({:04X}, {:04X})\n"), PMTPID, PCRPID);
+
+	m_ServicePMTPID = PMTPID;
+	m_ServicePCRPID = PCRPID;
+
+	if (m_SourceFilter) {
+		m_SourceFilter->SetAudioPinPMTPID(PMTPID);
+		m_SourceFilter->SetAudioPinPCRPID(PCRPID);
+	}
 
 	return true;
 }
