@@ -35,6 +35,7 @@
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_FAAD2.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_FDK.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_FFmpeg.hpp" />
+    <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_LATM.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AC3Decoder.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AudioDecoder.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AudioDecoderFilter.hpp" />
@@ -90,6 +91,9 @@
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\Thirdparty\BaseClasses\;$(SolutionDir)..\Thirdparty\fdk-aac\libAACdec\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libAACenc\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libArithCoding\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libDRCdec\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libFDK\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libMpegTPDec\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libMpegTPEnc\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libPCMutils\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libSACdec\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libSACenc\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libSBRdec\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libSBRenc\include\;$(SolutionDir)..\Thirdparty\fdk-aac\libSYS\include\</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_FFmpeg.cpp">
+      <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\BaseClasses\;C:\vcpkg\packages\ffmpeg_x64-windows\include\</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_LATM.cpp">
       <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\BaseClasses\;C:\vcpkg\packages\ffmpeg_x64-windows\include\</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AC3Decoder.cpp" />

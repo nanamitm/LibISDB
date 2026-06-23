@@ -73,6 +73,7 @@ namespace LibISDB::DirectShow
 #endif
 #ifdef LIBISDB_HAS_FFMPEG_AAC
 			FFmpeg_AAC,
+			LATM_AAC,
 #endif
 		};
 

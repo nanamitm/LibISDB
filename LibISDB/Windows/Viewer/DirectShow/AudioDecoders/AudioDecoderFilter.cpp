@@ -33,6 +33,7 @@
 #endif
 #ifdef LIBISDB_HAS_FFMPEG_AAC
 #include "AACDecoder_FFmpeg.hpp"
+#include "AACDecoder_LATM.hpp"
 #endif
 #include "MPEGAudioDecoder.hpp"
 #include "AC3Decoder.hpp"
@@ -1426,6 +1427,9 @@ AudioDecoder * AudioDecoderFilter::CreateDecoder(DecoderType Type)
 #ifdef LIBISDB_HAS_FFMPEG_AAC
 	case DecoderType::FFmpeg_AAC:
 		return new AACDecoder_FFmpeg;
+
+	case DecoderType::LATM_AAC:
+		return new AACDecoder_LATM;
 #endif
 
 	}
@@ -1461,6 +1465,10 @@ bool AudioDecoderFilter::GetDecoderVersion(DecoderType Type, std::string *pVersi
 #ifdef LIBISDB_HAS_FFMPEG_AAC
 	case DecoderType::FFmpeg_AAC:
 		AACDecoder_FFmpeg::GetVersion(pVersion);
+		return true;
+
+	case DecoderType::LATM_AAC:
+		AACDecoder_LATM::GetVersion(pVersion);
 		return true;
 #endif
 	}

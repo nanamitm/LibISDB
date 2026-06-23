@@ -2226,6 +2226,10 @@ void ViewerFilter::SetAudioDecoderType(BYTE StreamType)
 				DirectShow::AudioDecoderFilter::DecoderType::MPEGAudio :
 			StreamType == STREAM_TYPE_AC3 ?
 				DirectShow::AudioDecoderFilter::DecoderType::AC3 :
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+			StreamType == STREAM_TYPE_MPEG4_AUDIO ?
+				DirectShow::AudioDecoderFilter::DecoderType::LATM_AAC :
+#endif
 				DirectShow::AudioDecoderFilter::DecoderType::Invalid);
 	}
 }
