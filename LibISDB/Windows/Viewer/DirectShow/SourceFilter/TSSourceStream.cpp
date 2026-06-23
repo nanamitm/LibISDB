@@ -134,16 +134,27 @@ bool TSSourceStream::InputData(DataBuffer *pData)
 			// ため、ここで更新しないと m_PTSDuration が 0 のまま進まず、
 			// 充填率も上がりにくい音声専用ピンが初期バッファリングから
 			// 永久に抜けられず無音になる。
-			if ((PID == m_AudioPID) && pPacket->GetPayloadUnitStartIndicator()) {
-				const long long PTS = GetPacketPTS(pPacket);
-				if (PTS >= 0) {
-					if (m_AudioPTSPrev >= 0) {
-						if (m_AudioPTSPrev < PTS)
-							m_PTSDuration += PTS - m_AudioPTSPrev;
+			if (PID == m_AudioPID) {
+				if (pPacket->GetPayloadUnitStartIndicator()) {
+					const long long PTS = GetPacketPTS(pPacket);
+					if (PTS >= 0) {
+						if (m_AudioPTSPrev >= 0) {
+							if (m_AudioPTSPrev < PTS)
+								m_PTSDuration += PTS - m_AudioPTSPrev;
+						}
+						m_AudioPTSPrev = m_AudioPTS;
+						m_AudioPTS = PTS;
 					}
-					m_AudioPTSPrev = m_AudioPTS;
-					m_AudioPTS = PTS;
 				}
+
+				// 音声トラック切り替え時、IMPEG2PIDMap::MapPID() を呼び直すと
+				// 再生が一瞬止まるため、MapAudioPID() は実際の PID マップを
+				// 変えずに新トラックのパケットを旧トラックの PID に偽装する
+				// (m_AudioPID = 新PID, m_MapAudioPID = 旧PID)。この書き換えを
+				// 行わないと、デマルチプレクサは旧 PID のままなので新トラックの
+				// パケットが素通しされず、最初に選んだトラック以外で無音になる。
+				if (m_MapAudioPID != PID_INVALID)
+					pPacket->SetPID(m_MapAudioPID);
 			}
 			AddData(pData);
 		}
