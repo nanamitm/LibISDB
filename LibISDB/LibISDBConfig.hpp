@@ -49,8 +49,9 @@
 // (libavcodec/libswresample) で問題なくデコードできるか確認するための
 // 段階的なデコーダ。開発機にのみ存在する vcpkg のビルド出力 (packages/
 // ディレクトリ、通常の installed/ とは別) を直接指しているため、絶対パスで
-// 存在確認する。
-#if __has_include("C:/vcpkg/packages/ffmpeg_x64-windows/include/libavcodec/avcodec.h")
+// 存在確認する。x64 用の vcpkg パッケージしか用意していないため x64 ビルド
+// に限定する。
+#if defined(_M_X64) && __has_include("C:/vcpkg/packages/ffmpeg_x64-windows/include/libavcodec/avcodec.h")
 #define LIBISDB_HAS_FFMPEG_AAC
 #endif
 

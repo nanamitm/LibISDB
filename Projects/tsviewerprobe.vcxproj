@@ -126,7 +126,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
-      <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>LibISDBWindows.lib;strmbasd.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -144,8 +144,14 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
-      <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>LibISDBWindows.lib;strmbasd.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\vcpkg\packages\ffmpeg_x64-windows\debug\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\debug\bin\avcodec-62.dll" "$(OutDir)"
+copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\debug\bin\avutil-60.dll" "$(OutDir)"
+copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\debug\bin\swresample-6.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -250,8 +256,14 @@ copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\swresample-6.dll" "$(OutDir)"<
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
-      <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\vcpkg\packages\ffmpeg_x64-windows\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\avcodec-62.dll" "$(OutDir)"
+copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\avutil-60.dll" "$(OutDir)"
+copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\swresample-6.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Samples\tsviewerprobe.cpp" />
