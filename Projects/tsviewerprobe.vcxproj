@@ -145,12 +145,12 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
       <AdditionalDependencies>LibISDBWindows.lib;strmbasd.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\vcpkg\packages\ffmpeg_x64-windows\debug\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\debug\bin\avcodec-62.dll" "$(OutDir)"
-copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\debug\bin\avutil-60.dll" "$(OutDir)"
-copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\debug\bin\swresample-6.dll" "$(OutDir)"</Command>
+      <Command>copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\avcodec-62.dll" "$(OutDir)"
+copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\avutil-60.dll" "$(OutDir)"
+copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\swresample-6.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -226,12 +226,12 @@ copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\debug\bin\swresample-6.dll" "$(Out
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
       <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\vcpkg\packages\ffmpeg_x64-windows\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\avcodec-62.dll" "$(OutDir)"
-copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\avutil-60.dll" "$(OutDir)"
-copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\swresample-6.dll" "$(OutDir)"</Command>
+      <Command>copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\avcodec-62.dll" "$(OutDir)"
+copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\avutil-60.dll" "$(OutDir)"
+copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\swresample-6.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release_MD|x64'">
@@ -257,12 +257,12 @@ copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\swresample-6.dll" "$(OutDir)"<
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
       <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\vcpkg\packages\ffmpeg_x64-windows\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\avcodec-62.dll" "$(OutDir)"
-copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\avutil-60.dll" "$(OutDir)"
-copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\swresample-6.dll" "$(OutDir)"</Command>
+      <Command>copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\avcodec-62.dll" "$(OutDir)"
+copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\avutil-60.dll" "$(OutDir)"
+copy /Y "$(SolutionDir)..\Thirdparty\ffmpeg\bin\swresample-6.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
