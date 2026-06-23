@@ -42,6 +42,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdarg>
+#include <string>
 
 
 namespace LibISDB::DirectShow
@@ -74,10 +75,43 @@ constexpr long NUM_SAMPLE_BUFFERS = 4;
 constexpr REFERENCE_TIME MAX_JITTER = REFERENCE_TIME_SECOND / 5LL;
 
 
+// Only logs when the hosting .exe's .ini (same base name, same directory)
+// has [Debug] AudioTimingLogPath= set. When absent, the cached path stays
+// empty and every subsequent call returns immediately without touching
+// _wfopen_s, so normal use has no overhead and writes no file. Receive()/
+// Deliver() run per audio sample, so this matters - LibISDB is a reusable
+// library with no direct access to the host app's own settings object.
+const std::wstring &GetAudioTimingDebugLogPath()
+{
+	static const std::wstring s_Path = [] {
+		wchar_t ExePath[MAX_PATH] = {};
+		if (::GetModuleFileNameW(nullptr, ExePath, MAX_PATH) == 0)
+			return std::wstring();
+
+		std::wstring IniPath = ExePath;
+		const size_t Dot = IniPath.find_last_of(L'.');
+		if (Dot != std::wstring::npos)
+			IniPath.resize(Dot);
+		IniPath += L".ini";
+
+		wchar_t LogPath[MAX_PATH] = {};
+		::GetPrivateProfileStringW(L"Debug", L"AudioTimingLogPath", L"", LogPath, MAX_PATH, IniPath.c_str());
+
+		return std::wstring(LogPath);
+	}();
+
+	return s_Path;
+}
+
+
 void AudioTimingDebugLog(const wchar_t *pFormat, ...)
 {
+	const std::wstring &LogPath = GetAudioTimingDebugLogPath();
+	if (LogPath.empty())
+		return;
+
 	FILE *fp = nullptr;
-	if (_wfopen_s(&fp, L"C:\\Free Soft Ware\\TVTeset4k8k\\audio_decoder_timing_debug.log", L"a, ccs=UTF-8") != 0 || fp == nullptr)
+	if (_wfopen_s(&fp, LogPath.c_str(), L"a, ccs=UTF-8") != 0 || fp == nullptr)
 		return;
 	SYSTEMTIME st;
 	::GetLocalTime(&st);
