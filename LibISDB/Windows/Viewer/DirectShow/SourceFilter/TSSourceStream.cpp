@@ -127,8 +127,26 @@ bool TSSourceStream::InputData(DataBuffer *pData)
 	// が PID マッピングだけでストリームを認識するには PAT/PMT/PCR 相当のコンテキスト
 	// が必要だったため、その3つと音声 PID だけを許可する。
 	if (m_ExcludeVideo) {
-		if ((PID == PID_PAT) || (PID == m_PMTPID) || (PID == m_PCRPID) || (PID == m_AudioPID))
+		if ((PID == PID_PAT) || (PID == m_PMTPID) || (PID == m_PCRPID) || (PID == m_AudioPID)) {
+			// 初期バッファリングの完了判定 (TSSourcePin::ProcessStream() の
+			// m_Buffering) は、充填率に加えて GetPTSDuration() による低ビット
+			// レート救済を併用する。音声専用ピンはこの早期 return パスを通る
+			// ため、ここで更新しないと m_PTSDuration が 0 のまま進まず、
+			// 充填率も上がりにくい音声専用ピンが初期バッファリングから
+			// 永久に抜けられず無音になる。
+			if ((PID == m_AudioPID) && pPacket->GetPayloadUnitStartIndicator()) {
+				const long long PTS = GetPacketPTS(pPacket);
+				if (PTS >= 0) {
+					if (m_AudioPTSPrev >= 0) {
+						if (m_AudioPTSPrev < PTS)
+							m_PTSDuration += PTS - m_AudioPTSPrev;
+					}
+					m_AudioPTSPrev = m_AudioPTS;
+					m_AudioPTS = PTS;
+				}
+			}
 			AddData(pData);
+		}
 		return true;
 	}
 
@@ -153,6 +171,15 @@ bool TSSourceStream::InputData(DataBuffer *pData)
 		const long long PTS = GetPacketPTS(pPacket);
 		if (PTS >= 0) {
 			if (bVideoPacket) {
+				if (m_ExcludeAudio) {
+					// 音声を排除した映像専用ピンには音声 PTS が来ないため、
+					// GetPTSDuration() の低ビットレート救済を映像 PTS の
+					// 差分で代用する。
+					if (m_VideoPTSPrev >= 0) {
+						if (m_VideoPTSPrev < PTS)
+							m_PTSDuration += PTS - m_VideoPTSPrev;
+					}
+				}
 				m_VideoPTSPrev = m_VideoPTS;
 				m_VideoPTS = PTS;
 			} else {

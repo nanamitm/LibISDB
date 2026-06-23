@@ -177,6 +177,10 @@ void TSSourceFilter::Flush()
 
 bool TSSourceFilter::EnableSync(bool bEnable,bool b1Seg)
 {
+	// PTS 同期プール機構は映像 PTS と音声 PTS を両方見て互いを待ち合わせる
+	// 単一ストリーム前提の仕組みで、音声専用ピンは早期 return パスを通る
+	// ためこの機構に到達しない。音声専用ピンへ転送しても無意味なので
+	// 映像ピンのみに適用する。
 	if (m_pSrcPin)
 		return m_pSrcPin->EnableSync(bEnable, b1Seg);
 	return false;
@@ -217,17 +221,28 @@ void TSSourceFilter::SetOutputWhenPaused(bool bOutput)
 
 bool TSSourceFilter::SetBufferSize(size_t Size)
 {
+	bool Result = true;
 	if (m_pSrcPin)
-		return m_pSrcPin->SetBufferSize(Size);
-	return false;
+		Result = m_pSrcPin->SetBufferSize(Size) && Result;
+	if (m_pAudioSrcPin)
+		Result = m_pAudioSrcPin->SetBufferSize(Size) && Result;
+	return Result;
 }
 
 
 bool TSSourceFilter::SetInitialPoolPercentage(int Percentage)
 {
+	// 音声専用ピンもバッファリング率を揃えないと、映像ピンが初期バッファリングで
+	// 配信を保留している間に音声ピンだけ即座に配信を始めてしまい、グラフ全体の
+	// 基準クロック（音声レンダラー由来）が先行して進んでしまう。これにより、映像の
+	// 最初のサンプルが届く頃には基準クロックが既に数秒進んでいて、再生開始直後から
+	// 映像が音声に対して数秒遅れて見える原因になっていた。
+	bool Result = true;
 	if (m_pSrcPin)
-		return m_pSrcPin->SetInitialPoolPercentage(Percentage);
-	return false;
+		Result = m_pSrcPin->SetInitialPoolPercentage(Percentage) && Result;
+	if (m_pAudioSrcPin)
+		Result = m_pAudioSrcPin->SetInitialPoolPercentage(Percentage) && Result;
+	return Result;
 }
 
 
@@ -241,9 +256,12 @@ int TSSourceFilter::GetBufferFillPercentage() const
 
 bool TSSourceFilter::SetInputWait(DWORD Wait)
 {
+	bool Result = true;
 	if (m_pSrcPin)
-		return m_pSrcPin->SetInputWait(Wait);
-	return false;
+		Result = m_pSrcPin->SetInputWait(Wait) && Result;
+	if (m_pAudioSrcPin)
+		Result = m_pAudioSrcPin->SetInputWait(Wait) && Result;
+	return Result;
 }
 
 
