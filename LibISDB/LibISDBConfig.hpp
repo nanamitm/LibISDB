@@ -45,5 +45,14 @@
 #define LIBISDB_HAS_FDK_AAC
 #endif
 
+// 22.2ch (LATM) 対応の足がかりとして、まず既存の 2ch/6ch AAC を FFmpeg
+// (libavcodec/libswresample) で問題なくデコードできるか確認するための
+// 段階的なデコーダ。開発機にのみ存在する vcpkg のビルド出力 (packages/
+// ディレクトリ、通常の installed/ とは別) を直接指しているため、絶対パスで
+// 存在確認する。
+#if __has_include("C:/vcpkg/packages/ffmpeg_x64-windows/include/libavcodec/avcodec.h")
+#define LIBISDB_HAS_FFMPEG_AAC
+#endif
+
 
 #endif // ifndef LIBISDB_CONFIG_H

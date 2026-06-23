@@ -31,10 +31,16 @@
 #ifdef LIBISDB_HAS_FDK_AAC
 #include "AACDecoder_FDK.hpp"
 #endif
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+#include "AACDecoder_FFmpeg.hpp"
+#endif
 #include "MPEGAudioDecoder.hpp"
 #include "AC3Decoder.hpp"
 #include <mmreg.h>
 #include "../../../../Base/DebugDef.hpp"
+#include <chrono>
+#include <cstdio>
+#include <cstdarg>
 
 
 namespace LibISDB::DirectShow
@@ -65,6 +71,23 @@ constexpr long NUM_SAMPLE_BUFFERS = 4;
 
 // ジッタの許容上限
 constexpr REFERENCE_TIME MAX_JITTER = REFERENCE_TIME_SECOND / 5LL;
+
+
+void AudioTimingDebugLog(const wchar_t *pFormat, ...)
+{
+	FILE *fp = nullptr;
+	if (_wfopen_s(&fp, L"C:\\Free Soft Ware\\TVTeset4k8k\\audio_decoder_timing_debug.log", L"a, ccs=UTF-8") != 0 || fp == nullptr)
+		return;
+	SYSTEMTIME st;
+	::GetLocalTime(&st);
+	fwprintf(fp, L"%02d:%02d:%02d.%03d ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+	va_list args;
+	va_start(args, pFormat);
+	vfwprintf(fp, pFormat, args);
+	va_end(args);
+	fwprintf(fp, L"\n");
+	fclose(fp);
+}
 
 
 template<typename T> constexpr int16_t ClampSample16(T v)
@@ -481,7 +504,19 @@ HRESULT AudioDecoderFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 			m_InputDiscontinuity = false;
 			pOutSample->SetSyncPoint(TRUE);
 
+			const auto DeliverCallStart = std::chrono::steady_clock::now();
 			hr = m_pOutput->Deliver(pOutSample);
+			const auto DeliverCallEnd = std::chrono::steady_clock::now();
+			{
+				const double DeliverCallMs = std::chrono::duration<double, std::milli>(DeliverCallEnd - DeliverCallStart).count();
+				REFERENCE_TIME rtOutStart = -1, rtOutEnd = -1;
+				pOutSample->GetTime(&rtOutStart, &rtOutEnd);
+				AudioTimingDebugLog(
+					L"Deliver: callMs=%.2f hr=%08x rtStart=%lld rtEnd=%lld m_Delay=%lld m_DelayAdjustment=%lld discontinuity=%d",
+					DeliverCallMs, static_cast<unsigned int>(hr), (long long)rtOutStart, (long long)rtOutEnd,
+					(long long)m_Delay, (long long)m_DelayAdjustment,
+					pOutSample->IsDiscontinuity() == S_OK ? 1 : 0);
+			}
 #ifdef _DEBUG
 			if (FAILED(hr)) {
 				LIBISDB_TRACE(LIBISDB_STR("サンプルを送信できません。({:08x})\n"), hr);
@@ -506,6 +541,15 @@ HRESULT AudioDecoderFilter::Receive(IMediaSample *pSample)
 	const AM_SAMPLE2_PROPERTIES *pProps = m_pInput->SampleProps();
 	if (pProps->dwStreamId != AM_STREAM_MEDIA)
 		return m_pOutput->Deliver(pSample);
+
+	{
+		REFERENCE_TIME rtInStart = -1, rtInEnd = -1;
+		pSample->GetTime(&rtInStart, &rtInEnd);
+		AudioTimingDebugLog(
+			L"Receive: size=%ld rtStart=%lld rtEnd=%lld discontinuity=%d",
+			pSample->GetActualDataLength(), (long long)rtInStart, (long long)rtInEnd,
+			pSample->IsDiscontinuity() == S_OK ? 1 : 0);
+	}
 
 	HRESULT hr;
 
@@ -1379,6 +1423,11 @@ AudioDecoder * AudioDecoderFilter::CreateDecoder(DecoderType Type)
 		return new AACDecoder_FDK;
 #endif
 
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+	case DecoderType::FFmpeg_AAC:
+		return new AACDecoder_FFmpeg;
+#endif
+
 	}
 
 	return nullptr;
@@ -1406,6 +1455,12 @@ bool AudioDecoderFilter::GetDecoderVersion(DecoderType Type, std::string *pVersi
 #ifdef LIBISDB_HAS_FDK_AAC
 	case DecoderType::FDK_AAC:
 		AACDecoder_FDK::GetVersion(pVersion);
+		return true;
+#endif
+
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+	case DecoderType::FFmpeg_AAC:
+		AACDecoder_FFmpeg::GetVersion(pVersion);
 		return true;
 #endif
 	}

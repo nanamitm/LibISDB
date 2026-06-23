@@ -1701,6 +1701,11 @@ LPCTSTR ViewerFilter::GetAACDecoderName(AACDecoderType Type)
 	case AACDecoderType::FDK_AAC:
 		return TEXT("Fraunhofer FDK AAC");
 #endif
+
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+	case AACDecoderType::FFmpeg:
+		return TEXT("FFmpeg");
+#endif
 	}
 
 	return nullptr;
@@ -1722,6 +1727,12 @@ bool ViewerFilter::GetAACDecoderVersion(AACDecoderType Type, std::string *pVersi
 #ifdef LIBISDB_HAS_FDK_AAC
 	case AACDecoderType::FDK_AAC:
 		Decoder = DirectShow::AudioDecoderFilter::DecoderType::FDK_AAC;
+		break;
+#endif
+
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+	case AACDecoderType::FFmpeg:
+		Decoder = DirectShow::AudioDecoderFilter::DecoderType::FFmpeg_AAC;
 		break;
 #endif
 
@@ -2204,6 +2215,10 @@ void ViewerFilter::SetAudioDecoderType(BYTE StreamType)
 #ifdef LIBISDB_HAS_FDK_AAC
 				m_AACDecoderType == AACDecoderType::FDK_AAC ?
 					DirectShow::AudioDecoderFilter::DecoderType::FDK_AAC :
+#endif
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+				m_AACDecoderType == AACDecoderType::FFmpeg ?
+					DirectShow::AudioDecoderFilter::DecoderType::FFmpeg_AAC :
 #endif
 					DirectShow::AudioDecoderFilter::DecoderType::AAC) :
 			StreamType == STREAM_TYPE_MPEG1_AUDIO ||

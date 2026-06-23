@@ -219,8 +219,14 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
-      <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\vcpkg\packages\ffmpeg_x64-windows\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\avcodec-62.dll" "$(OutDir)"
+copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\avutil-60.dll" "$(OutDir)"
+copy /Y "C:\vcpkg\packages\ffmpeg_x64-windows\bin\swresample-6.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release_MD|x64'">
     <ClCompile>

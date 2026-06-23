@@ -134,6 +134,10 @@ int wmain(int argc, wchar_t **argv)
 			const std::wstring Value = argv[++i];
 			AACDecoder = (Value == L"fdk")
 				? LibISDB::ViewerFilter::AACDecoderType::FDK_AAC
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+				: (Value == L"ffmpeg")
+				? LibISDB::ViewerFilter::AACDecoderType::FFmpeg
+#endif
 				: LibISDB::ViewerFilter::AACDecoderType::FAAD2;
 		} else if (Arg == L"--pts-sync" && i + 1 < argc) {
 			const std::wstring Value = argv[++i];
@@ -227,7 +231,11 @@ int wmain(int argc, wchar_t **argv)
 				<< L"[INFO] Opening viewer (decoder=" << VideoDecoderName
 				<< L" renderer=" << RendererName
 				<< L" audioClock=" << (UseAudioRendererClock ? L"on" : L"off")
-				<< L" aacDecoder=" << (AACDecoder == LibISDB::ViewerFilter::AACDecoderType::FDK_AAC ? L"fdk" : L"faad2")
+				<< L" aacDecoder=" << (AACDecoder == LibISDB::ViewerFilter::AACDecoderType::FDK_AAC ? L"fdk" :
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+					AACDecoder == LibISDB::ViewerFilter::AACDecoderType::FFmpeg ? L"ffmpeg" :
+#endif
+					L"faad2")
 				<< L" ptsSync=" << (PTSSync ? L"on" : L"off")
 				<< L" bufferSize=" << (BufferSize != 0 ? BufferSize : 4096)
 				<< L")" << std::endl;

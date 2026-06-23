@@ -107,6 +107,11 @@ namespace LibISDB
 			FAAD2,
 #ifdef LIBISDB_HAS_FDK_AAC
 			FDK_AAC,
+#endif
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+			FFmpeg,
+#endif
+#ifdef LIBISDB_HAS_FDK_AAC
 			Default = FDK_AAC,
 #else
 			Default = FAAD2,

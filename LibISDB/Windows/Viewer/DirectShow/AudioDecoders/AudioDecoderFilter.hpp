@@ -71,6 +71,9 @@ namespace LibISDB::DirectShow
 #ifdef LIBISDB_HAS_FDK_AAC
 			FDK_AAC,
 #endif
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+			FFmpeg_AAC,
+#endif
 		};
 
 		enum class DualMonoMode {
