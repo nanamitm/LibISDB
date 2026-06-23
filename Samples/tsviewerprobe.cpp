@@ -116,6 +116,7 @@ int wmain(int argc, wchar_t **argv)
 	LibISDB::ViewerFilter::AACDecoderType AACDecoder = LibISDB::ViewerFilter::AACDecoderType::FAAD2;
 	bool PTSSync = true;
 	size_t BufferSize = 0;
+	bool NoVideo = false;
 
 	for (int i = 2; i < argc; i++) {
 		const std::wstring Arg = argv[i];
@@ -139,6 +140,8 @@ int wmain(int argc, wchar_t **argv)
 			PTSSync = (Value == L"on");
 		} else if (Arg == L"--buffer-size" && i + 1 < argc) {
 			BufferSize = static_cast<size_t>(std::wcstoull(argv[++i], nullptr, 10));
+		} else if (Arg == L"--no-video") {
+			NoVideo = true;
 		}
 	}
 
@@ -217,7 +220,7 @@ int wmain(int argc, wchar_t **argv)
 			Settings.hwndRender = hwnd;
 			Settings.hwndMessageDrain = hwnd;
 			Settings.VideoRenderer = ParseRendererType(RendererName);
-			Settings.VideoStreamType = VideoStreamType;
+			Settings.VideoStreamType = NoVideo ? LibISDB::STREAM_TYPE_INVALID : VideoStreamType;
 			Settings.pszVideoDecoder = VideoDecoderName.c_str();
 
 			std::wcout
@@ -271,6 +274,13 @@ int wmain(int argc, wchar_t **argv)
 				pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SILENCE_DUR, &SilenceDur, &Unused);
 				pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_LAST_BUFFER_DUR, &LastBufferDur, &Unused);
 				pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_JITTER, &Jitter, &Unused);
+
+				LibISDB::TSPacketParserFilter::PacketCountInfo Count = pParser->GetTotalPacketCount();
+				AudioRendererStatsLog(
+					L"[SRC] isSourceOpen=%d inputBytes=%llu inputPackets=%llu",
+					Engine.IsSourceOpen(),
+					static_cast<unsigned long long>(pParser->GetTotalInputBytes()),
+					static_cast<unsigned long long>(Count.Input));
 
 				AudioRendererStatsLog(
 					L"breakCount=%lu silenceDur=%lu lastBufferDur=%lu jitter=%lu",
