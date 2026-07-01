@@ -304,7 +304,7 @@ void ViewerFilter::SetActiveAudioPID(uint16_t PID, bool ServiceChanged)
 			&& (UseMap || PID == m_MapAudioPID))
 		return;
 
-	LIBISDB_TRACE(LIBISDB_STR("ViewerFilter::SetActiveAudioPID() : {:04X} <- {:04X}\n"), PID, m_AudioPID);
+	LIBISDB_TRACE(LIBISDB_STR("ViewerFilter::SetActiveAudioPID() : {:04X} <- {:04X} (ServiceChanged={} UseMap={} MapAudioPID={:04X})\n"), PID, m_AudioPID, ServiceChanged, UseMap, m_MapAudioPID);
 
 	if (UseMap && (PID != PID_INVALID) && (m_MapAudioPID != PID_INVALID)) {
 		/*
@@ -318,13 +318,17 @@ void ViewerFilter::SetActiveAudioPID(uint16_t PID, bool ServiceChanged)
 			// 現在のPIDをアンマップ
 			if (m_MapAudioPID != PID_INVALID) {
 				ULONG OldPID = m_MapAudioPID;
-				if (m_MPEG2DemuxerAudioMap->UnmapPID(1, &OldPID) != S_OK)
+				const HRESULT hrUnmap = m_MPEG2DemuxerAudioMap->UnmapPID(1, &OldPID);
+				if (hrUnmap != S_OK) {
+					LIBISDB_TRACE_WARNING(LIBISDB_STR("ViewerFilter::SetActiveAudioPID() : UnmapPID({:04X}) failed ({:08X})\n"), OldPID, static_cast<DWORD>(hrUnmap));
 					return;
+				}
 				m_MapAudioPID = PID_INVALID;
 			}
 		}
 
 		if (!MapAudioPID(PID)) {
+			LIBISDB_TRACE_WARNING(LIBISDB_STR("ViewerFilter::SetActiveAudioPID() : MapAudioPID({:04X}) failed\n"), PID);
 			m_AudioPID = PID_INVALID;
 			return;
 		}
@@ -2172,8 +2176,11 @@ bool ViewerFilter::MapAudioPID(uint16_t PID)
 		// 新規にPIDをマップ
 		if (PID != PID_INVALID) {
 			ULONG TempPID = PID;
-			if (m_MPEG2DemuxerAudioMap->MapPID(1, &TempPID, MEDIA_ELEMENTARY_STREAM) != S_OK)
+			const HRESULT hrMap = m_MPEG2DemuxerAudioMap->MapPID(1, &TempPID, MEDIA_ELEMENTARY_STREAM);
+			if (hrMap != S_OK) {
+				LIBISDB_TRACE_WARNING(LIBISDB_STR("ViewerFilter::MapAudioPID() : MapPID({:04X}) failed ({:08X})\n"), PID, static_cast<DWORD>(hrMap));
 				return false;
+			}
 			m_MapAudioPID = PID;
 		}
 	}

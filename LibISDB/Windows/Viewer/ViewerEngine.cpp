@@ -308,6 +308,15 @@ void ViewerEngine::OnServiceChanged(uint16_t ServiceID)
 {
 	if ((m_pViewer != nullptr) && (m_pAnalyzer != nullptr)) {
 		m_pViewer->Set1SegMode(m_pAnalyzer->Is1SegService(m_pAnalyzer->GetServiceIndexByID(ServiceID)));
+		// 同一 TS 内でサービスを切り替えた場合、PSI パーサがバージョン番号で
+		// 重複排除するため OnPMTUpdated が再発火しないことがある。その結果、
+		// 音声専用ピンの PMT/PCR 許可リストが旧サービスのままになり、新サービスの
+		// PCR パケットがデマルチプレクサに届かず無音になる。サービス切替時は
+		// 常にアナライザから取得した最新値で上書きして確実に更新する。
+		AnalyzerFilter::ServiceInfo Info;
+		if (m_pAnalyzer->GetServiceInfoByID(ServiceID, &Info)) {
+			m_pViewer->SetServicePIDInfo(Info.PMTPID, Info.PCRPID);
+		}
 	}
 }
 
