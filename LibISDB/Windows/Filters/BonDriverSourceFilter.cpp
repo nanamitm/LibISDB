@@ -686,6 +686,19 @@ bool BonDriverSourceFilter::SetMinChannelChangeInterval(unsigned long Interval)
 }
 
 
+bool BonDriverSourceFilter::SetRequestTimeout(unsigned long Timeout)
+{
+	if ((Timeout < REQUEST_TIMEOUT_MIN) || (Timeout > REQUEST_TIMEOUT_MAX))
+		return false;
+
+	LIBISDB_TRACE(LIBISDB_STR("BonDriverSourceFilter::SetRequestTimeout({})\n"), Timeout);
+
+	m_RequestTimeout = std::chrono::milliseconds(Timeout);
+
+	return true;
+}
+
+
 void BonDriverSourceFilter::ThreadMain()
 {
 	LIBISDB_TRACE(LIBISDB_STR("BonDriverSourceFilter::ThreadMain() begin\n"));

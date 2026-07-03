@@ -66,6 +66,8 @@ namespace LibISDB
 
 		static constexpr unsigned long FIRST_CHANNEL_SET_DELAY_MAX = 5000UL;
 		static constexpr unsigned long CHANNEL_CHANGE_INTERVAL_MAX = 5000UL;
+		static constexpr unsigned long REQUEST_TIMEOUT_MIN = 1000UL;
+		static constexpr unsigned long REQUEST_TIMEOUT_MAX = 60000UL;
 
 		static constexpr uint32_t SPACE_INVALID   = BonDriver::SPACE_INVALID;
 		static constexpr uint32_t CHANNEL_INVALID = BonDriver::CHANNEL_INVALID;
@@ -123,6 +125,8 @@ namespace LibISDB
 		unsigned long GetFirstChannelSetDelay() const noexcept { return m_FirstChannelSetDelay; }
 		bool SetMinChannelChangeInterval(unsigned long Interval);
 		unsigned long GetMinChannelChangeInterval() const noexcept { return m_MinChannelChangeInterval; }
+		bool SetRequestTimeout(unsigned long Timeout);
+		unsigned long GetRequestTimeout() const noexcept { return static_cast<unsigned long>(m_RequestTimeout.count()); }
 
 		static const ErrorCategory & GetErrorCategory() noexcept { return m_ErrorCategory; }
 
