@@ -66,9 +66,10 @@ constexpr size_t LOAS_MAX_PAYLOAD_SIZE = 8191;
 void AACDecoder_LATM::GetVersion(std::string *pVersion)
 {
 	char Buf[64];
+	const unsigned int Version = ::avcodec_version();
 	std::snprintf(
 		Buf, sizeof(Buf), "FFmpeg libavcodec %d.%d.%d (LATM)",
-		LIBAVCODEC_VERSION_MAJOR, LIBAVCODEC_VERSION_MINOR, LIBAVCODEC_VERSION_MICRO);
+		AV_VERSION_MAJOR(Version), AV_VERSION_MINOR(Version), AV_VERSION_MICRO(Version));
 	*pVersion = Buf;
 }
 

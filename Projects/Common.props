@@ -4,6 +4,10 @@
     <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <GenerateManifest>false</GenerateManifest>
+    <LibISDBFFmpegBinDir>$(MSBuildThisFileDirectory)..\Thirdparty\ffmpeg\bin\</LibISDBFFmpegBinDir>
+    <LibISDBFFmpegAvcodecDll>avcodec-63.dll</LibISDBFFmpegAvcodecDll>
+    <LibISDBFFmpegAvutilDll>avutil-61.dll</LibISDBFFmpegAvutilDll>
+    <LibISDBFFmpegSwresampleDll>swresample-7.dll</LibISDBFFmpegSwresampleDll>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(VisualStudioVersion)'=='16.0'">
     <PlatformToolset>v142</PlatformToolset>

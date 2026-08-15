@@ -1,15 +1,21 @@
-This directory vendors prebuilt FFmpeg 8.1.1 (x64-windows) binaries and
+This directory vendors prebuilt FFmpeg 9.0.1 (x64-windows) binaries and
 headers, limited to the avcodec, avutil, and swresample components used
 by AACDecoder_FFmpeg / AACDecoder_LATM.
 
-FFmpeg source for this version: https://github.com/FFmpeg/FFmpeg/releases/tag/n8.1.1
+FFmpeg source for this version: https://github.com/FFmpeg/FFmpeg/releases/tag/n9.0.1
 
 Build: vcpkg ffmpeg port, x64-windows triplet. Configuration does not
 include --enable-gpl, --enable-version3, or --enable-nonfree, so this
 build is licensed under the GNU Lesser General Public License (LGPL),
-confirmed directly from the version string embedded in avcodec-62.dll
-("libavcodec license: LGPL version 2.1 or later"). No additional
-codec libraries (x264, x265, fdk-aac, etc.) are linked in.
+confirmed by calling avcodec_license(), avutil_license(), and
+swresample_license() in the bundled DLLs (all return
+"LGPL version 2.1 or later"). No additional codec libraries
+(x264, x265, fdk-aac, etc.) are linked in.
+
+Bundled library versions:
+- libavcodec 63.1.101 (avcodec-63.dll)
+- libavutil 61.1.101 (avutil-61.dll)
+- libswresample 7.1.101 (swresample-7.dll)
 
 License text: COPYING.LGPLv2.1 (this directory)
 FFmpeg source and legal info: https://ffmpeg.org/legal.html
