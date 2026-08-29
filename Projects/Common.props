@@ -15,6 +15,9 @@
   <PropertyGroup Label="Configuration" Condition="'$(VisualStudioVersion)'=='17.0'">
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(VisualStudioVersion)'=='18.0'">
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <StringPooling>true</StringPooling>

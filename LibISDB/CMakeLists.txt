@@ -21,6 +21,7 @@ add_library(LibISDB STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/Base/FileStreamPOSIX.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Base/JISKanjiMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Base/Logger.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Base/MemoryStream.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Base/ObjectBase.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Base/SIMD.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Base/StandardStream.cpp
@@ -33,6 +34,7 @@ add_library(LibISDB STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/Engine/TSEngine.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/EPG/EPGDatabase.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/EPG/EPGDataFile.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/EPG/EPGDataSerializer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/EPG/EventInfo.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Filters/AnalyzerFilter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Filters/AsyncStreamingFilter.cpp

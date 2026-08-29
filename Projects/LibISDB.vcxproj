@@ -47,6 +47,7 @@
     <ClInclude Include="..\LibISDB\Base\FileStreamWindows.hpp" />
     <ClInclude Include="..\LibISDB\Base\JISKanjiMap.hpp" />
     <ClInclude Include="..\LibISDB\Base\Logger.hpp" />
+    <ClInclude Include="..\LibISDB\Base\MemoryStream.hpp" />
     <ClInclude Include="..\LibISDB\Base\ObjectBase.hpp" />
     <ClInclude Include="..\LibISDB\Base\SIMD.hpp" />
     <ClInclude Include="..\LibISDB\Base\StandardStream.hpp" />
@@ -60,6 +61,7 @@
     <ClInclude Include="..\LibISDB\Engine\TSEngine.hpp" />
     <ClInclude Include="..\LibISDB\EPG\EPGDatabase.hpp" />
     <ClInclude Include="..\LibISDB\EPG\EPGDataFile.hpp" />
+    <ClInclude Include="..\LibISDB\EPG\EPGDataSerializer.hpp" />
     <ClInclude Include="..\LibISDB\EPG\EventInfo.hpp" />
     <ClInclude Include="..\LibISDB\Filters\AnalyzerFilter.hpp" />
     <ClInclude Include="..\LibISDB\Filters\AsyncStreamingFilter.hpp" />
@@ -136,6 +138,7 @@
     <ClCompile Include="..\LibISDB\Base\FileStreamWindows.cpp" />
     <ClCompile Include="..\LibISDB\Base\JISKanjiMap.cpp" />
     <ClCompile Include="..\LibISDB\Base\Logger.cpp" />
+    <ClCompile Include="..\LibISDB\Base\MemoryStream.cpp" />
     <ClCompile Include="..\LibISDB\Base\ObjectBase.cpp" />
     <ClCompile Include="..\LibISDB\Base\SIMD.cpp" />
     <ClCompile Include="..\LibISDB\Base\StandardStream.cpp" />
@@ -148,6 +151,7 @@
     <ClCompile Include="..\LibISDB\Engine\TSEngine.cpp" />
     <ClCompile Include="..\LibISDB\EPG\EPGDatabase.cpp" />
     <ClCompile Include="..\LibISDB\EPG\EPGDataFile.cpp" />
+    <ClCompile Include="..\LibISDB\EPG\EPGDataSerializer.cpp" />
     <ClCompile Include="..\LibISDB\EPG\EventInfo.cpp" />
     <ClCompile Include="..\LibISDB\Filters\AnalyzerFilter.cpp" />
     <ClCompile Include="..\LibISDB\Filters\AsyncStreamingFilter.cpp" />
