@@ -274,6 +274,9 @@
     <ClInclude Include="..\LibISDB\Base\Logger.hpp">
       <Filter>Base\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\LibISDB\Base\MemoryStream.hpp">
+      <Filter>Base\Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\LibISDB\Base\FileStreamGenericC.hpp">
       <Filter>Base\Header Files</Filter>
     </ClInclude>
@@ -287,6 +290,9 @@
       <Filter>Filters\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\LibISDB\EPG\EPGDataFile.hpp">
+      <Filter>EPG\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\LibISDB\EPG\EPGDataSerializer.hpp">
       <Filter>EPG\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\LibISDB\Filters\RecorderFilter.hpp">
@@ -504,6 +510,9 @@
     <ClCompile Include="..\LibISDB\Base\Logger.cpp">
       <Filter>Base\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\LibISDB\Base\MemoryStream.cpp">
+      <Filter>Base\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\LibISDB\Base\FileStreamGenericC.cpp">
       <Filter>Base\Source Files</Filter>
     </ClCompile>
@@ -514,6 +523,9 @@
       <Filter>Filters\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\LibISDB\EPG\EPGDataFile.cpp">
+      <Filter>EPG\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\LibISDB\EPG\EPGDataSerializer.cpp">
       <Filter>EPG\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\LibISDB\Filters\RecorderFilter.cpp">

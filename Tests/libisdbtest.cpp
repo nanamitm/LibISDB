@@ -352,6 +352,278 @@ TEST_CASE("DateTime", "[base][time]")
 }
 
 
+#include "../LibISDB/Base/MemoryStream.hpp"
+
+TEST_CASE("MemoryStream", "[base][stream]")
+{
+	LibISDB::MemoryStream Stream;
+
+	CHECK(Stream.IsOpen());
+	CHECK(Stream.IsEnd());
+	CHECK(Stream.GetSize() == 0);
+	CHECK(Stream.GetPos() == 0);
+
+	static const std::uint8_t Data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+
+	CHECK(Stream.Write(Data, 4) == 4);
+	CHECK(Stream.Write(Data + 4, 4) == 4);
+	CHECK(Stream.GetSize() == 8);
+	CHECK(Stream.GetPos() == 8);
+	CHECK(Stream.IsEnd());
+	CHECK(std::memcmp(Stream.GetData(), Data, 8) == 0);
+
+	// 読み込み
+	CHECK(Stream.SetPos(0));
+	CHECK_FALSE(Stream.IsEnd());
+
+	std::uint8_t Buffer[8] = {};
+
+	CHECK(Stream.Read(Buffer, 3) == 3);
+	CHECK(std::memcmp(Buffer, Data, 3) == 0);
+	CHECK(Stream.GetPos() == 3);
+
+	// 終端を超える読み込みは読める分だけ読まれる
+	CHECK(Stream.Read(Buffer, 8) == 5);
+	CHECK(std::memcmp(Buffer, Data + 3, 5) == 0);
+	CHECK(Stream.IsEnd());
+	CHECK(Stream.Read(Buffer, 1) == 0);
+
+	// シーク
+	CHECK(Stream.SetPos(-2, LibISDB::Stream::SetPosType::End));
+	CHECK(Stream.GetPos() == 6);
+	CHECK(Stream.SetPos(-4, LibISDB::Stream::SetPosType::Current));
+	CHECK(Stream.GetPos() == 2);
+	CHECK_FALSE(Stream.SetPos(-1));
+	CHECK_FALSE(Stream.SetPos(9));
+	CHECK(Stream.GetPos() == 2);
+
+	// 途中への上書き
+	CHECK(Stream.Write(Data, 2) == 2);
+	CHECK(Stream.GetSize() == 8);
+	CHECK(Stream.GetData()[2] == 0x01);
+	CHECK(Stream.GetData()[3] == 0x02);
+
+	// 最大サイズ
+	CHECK(Stream.SetPos(0, LibISDB::Stream::SetPosType::End));
+	Stream.SetMaxSize(10);
+	CHECK(Stream.Write(Data, 2) == 2);
+	CHECK(Stream.Write(Data, 1) == 0);
+	CHECK(Stream.GetSize() == 10);
+
+	Stream.SetMaxSize(0);
+	Stream.Clear();
+	CHECK(Stream.GetSize() == 0);
+	CHECK(Stream.GetPos() == 0);
+
+	// バッファの受け渡し
+	CHECK(Stream.SetData(Data, sizeof(Data)));
+	CHECK(Stream.GetSize() == sizeof(Data));
+	CHECK(Stream.GetPos() == 0);
+
+	LibISDB::MemoryStream::BufferType DetachedBuffer = Stream.DetachBuffer();
+
+	CHECK(DetachedBuffer.size() == sizeof(Data));
+	CHECK(Stream.GetSize() == 0);
+}
+
+
+#include "../LibISDB/EPG/EPGDataSerializer.hpp"
+
+namespace
+{
+
+LibISDB::EventInfo MakeTestEvent(std::uint16_t EventID, std::uint64_t UpdatedTime)
+{
+	LibISDB::EventInfo Event;
+
+	Event.NetworkID = 0x0004;
+	Event.TransportStreamID = 0x4010;
+	Event.ServiceID = 0x00E4;
+	Event.EventID = EventID;
+	Event.StartTime.Year = 2026;
+	Event.StartTime.Month = 8;
+	Event.StartTime.Day = 29;
+	Event.StartTime.Hour = 21;
+	Event.StartTime.Minute = 30;
+	Event.StartTime.Second = 0;
+	Event.StartTime.Millisecond = 0;
+	Event.StartTime.SetDayOfWeek();
+	Event.Duration = 3600;
+	Event.RunningStatus = 4;
+	Event.FreeCAMode = true;
+	Event.EventName = LIBISDB_STR("テスト番組『表題』");
+	Event.EventText = LIBISDB_STR("概要のテキスト\r\n2行目");
+	Event.Type = LibISDB::EventInfo::TypeFlag::Basic | LibISDB::EventInfo::TypeFlag::Extended;
+	Event.UpdatedTime = UpdatedTime;
+
+	Event.ExtendedText.resize(2);
+	Event.ExtendedText[0].Description = LIBISDB_STR("出演者");
+	Event.ExtendedText[0].Text = LIBISDB_STR("山田太郎、鈴木花子");
+	Event.ExtendedText[1].Description = LIBISDB_STR("番組内容");
+	Event.ExtendedText[1].Text = LIBISDB_STR("サロゲートペアを含む \U00020BB7 のテキスト");
+
+	Event.VideoList.resize(1);
+	Event.VideoList[0].StreamContent = 0x01;
+	Event.VideoList[0].ComponentType = 0xB1;
+	Event.VideoList[0].ComponentTag = 0x00;
+	Event.VideoList[0].LanguageCode = 0x6A706E;
+	Event.VideoList[0].Text = LIBISDB_STR("映像");
+
+	Event.AudioList.resize(2);
+	Event.AudioList[0].StreamContent = 0x02;
+	Event.AudioList[0].ComponentType = 0x03;
+	Event.AudioList[0].ComponentTag = 0x10;
+	Event.AudioList[0].SimulcastGroupTag = 0xFF;
+	Event.AudioList[0].ESMultiLingualFlag = false;
+	Event.AudioList[0].MainComponentFlag = true;
+	Event.AudioList[0].QualityIndicator = 1;
+	Event.AudioList[0].SamplingRate = 7;
+	Event.AudioList[0].LanguageCode = 0x6A706E;
+	Event.AudioList[0].LanguageCode2 = 0;
+	Event.AudioList[0].Text = LIBISDB_STR("主音声");
+	Event.AudioList[1] = Event.AudioList[0];
+	Event.AudioList[1].ComponentTag = 0x11;
+	Event.AudioList[1].ESMultiLingualFlag = true;
+	Event.AudioList[1].MainComponentFlag = false;
+	Event.AudioList[1].LanguageCode2 = 0x656E67;
+	Event.AudioList[1].Text = LIBISDB_STR("副音声");
+
+	Event.ContentNibble.NibbleCount = 2;
+	Event.ContentNibble.NibbleList[0].ContentNibbleLevel1 = 0x7;
+	Event.ContentNibble.NibbleList[0].ContentNibbleLevel2 = 0x3;
+	Event.ContentNibble.NibbleList[0].UserNibble1 = 0xF;
+	Event.ContentNibble.NibbleList[0].UserNibble2 = 0xF;
+	Event.ContentNibble.NibbleList[1].ContentNibbleLevel1 = 0x1;
+	Event.ContentNibble.NibbleList[1].ContentNibbleLevel2 = 0x2;
+	Event.ContentNibble.NibbleList[1].UserNibble1 = 0x0;
+	Event.ContentNibble.NibbleList[1].UserNibble2 = 0x1;
+
+	Event.EventGroupList.resize(1);
+	Event.EventGroupList[0].GroupType = LibISDB::EventGroupDescriptor::GROUP_TYPE_COMMON;
+	Event.EventGroupList[0].EventList.resize(2);
+	Event.EventGroupList[0].EventList[0] = {0x00E4, 0x1234, 0x0004, 0x4010};
+	Event.EventGroupList[0].EventList[1] = {0x00E5, 0x1235, 0x0004, 0x4011};
+
+	return Event;
+}
+
+}	// namespace
+
+TEST_CASE("EPGDataSerializer", "[epg][serialize]")
+{
+	const LibISDB::EPGDatabase::ServiceInfo Service(0x0004, 0x4010, 0x00E4);
+
+	LibISDB::EPGDatabase SrcDatabase;
+
+	{
+		LibISDB::EPGDatabase::EventList EventList;
+
+		EventList.push_back(MakeTestEvent(0x1000, 1000));
+		EventList.push_back(MakeTestEvent(0x1001, 2000));
+		EventList[1].StartTime.OffsetHours(1);
+		EventList[1].EventName = LIBISDB_STR("2番目の番組");
+		EventList[1].ExtendedText.clear();
+		EventList[1].EventGroupList.clear();
+		EventList[1].IsCommonEvent = true;
+		EventList[1].CommonEvent.ServiceID = 0x00E5;
+		EventList[1].CommonEvent.EventID = 0x2001;
+
+		CHECK(SrcDatabase.SetServiceEventList(Service, std::move(EventList)));
+	}
+
+	LibISDB::MemoryStream Stream;
+	LibISDB::EPGDataSerializer::ServiceHeader Header;
+
+	REQUIRE(LibISDB::EPGDataSerializer::SerializeService(
+		SrcDatabase, Service.NetworkID, Service.TransportStreamID, Service.ServiceID,
+		Stream, &Header));
+
+	CHECK(Header.NetworkID == Service.NetworkID);
+	CHECK(Header.TransportStreamID == Service.TransportStreamID);
+	CHECK(Header.ServiceID == Service.ServiceID);
+	CHECK(Header.EventCount == 2);
+	CHECK(Header.UpdatedTime == 2000);
+
+	// ヘッダのみの取得
+	{
+		LibISDB::EPGDataSerializer::ServiceHeader PeekedHeader;
+
+		CHECK(LibISDB::EPGDataSerializer::PeekHeader(
+			Stream.GetData(), Stream.GetDataSize(), &PeekedHeader));
+		CHECK(PeekedHeader.ServiceID == Header.ServiceID);
+		CHECK(PeekedHeader.EventCount == Header.EventCount);
+		CHECK(PeekedHeader.UpdatedTime == Header.UpdatedTime);
+
+		// 短すぎるデータ / 不正なデータ
+		CHECK_FALSE(LibISDB::EPGDataSerializer::PeekHeader(
+			Stream.GetData(), LibISDB::EPGDataSerializer::HeaderSize - 1, &PeekedHeader));
+
+		LibISDB::MemoryStream::BufferType Broken(
+			Stream.GetData(), Stream.GetData() + LibISDB::EPGDataSerializer::HeaderSize);
+		Broken[0] = 'X';
+		CHECK_FALSE(LibISDB::EPGDataSerializer::PeekHeader(
+			Broken.data(), Broken.size(), &PeekedHeader));
+	}
+
+	// 往復
+	LibISDB::EPGDatabase DstDatabase;
+	LibISDB::EPGDataSerializer::ServiceHeader ReadHeader;
+
+	REQUIRE(Stream.SetPos(0));
+	REQUIRE(LibISDB::EPGDataSerializer::DeserializeService(Stream, DstDatabase, &ReadHeader));
+
+	CHECK(ReadHeader.NetworkID == Header.NetworkID);
+	CHECK(ReadHeader.TransportStreamID == Header.TransportStreamID);
+	CHECK(ReadHeader.ServiceID == Header.ServiceID);
+	CHECK(ReadHeader.EventCount == Header.EventCount);
+	CHECK(ReadHeader.UpdatedTime == Header.UpdatedTime);
+
+	LibISDB::EPGDatabase::EventList SrcList, DstList;
+
+	REQUIRE(SrcDatabase.GetEventListSortedByTime(
+		Service.NetworkID, Service.TransportStreamID, Service.ServiceID, &SrcList));
+	REQUIRE(DstDatabase.GetEventListSortedByTime(
+		Service.NetworkID, Service.TransportStreamID, Service.ServiceID, &DstList));
+
+	REQUIRE(SrcList.size() == 2);
+	REQUIRE(DstList.size() == SrcList.size());
+
+	for (std::size_t i = 0; i < SrcList.size(); i++) {
+		// SourceID は転送されないため IsEqual() で比較する
+		CHECK(SrcList[i].IsEqual(DstList[i]));
+		CHECK(SrcList[i].Type == DstList[i].Type);
+		CHECK(SrcList[i].UpdatedTime == DstList[i].UpdatedTime);
+	}
+
+	// マージ元として使用できること
+	LibISDB::EPGDatabase MergeDatabase;
+
+	CHECK(MergeDatabase.MergeService(
+		&DstDatabase, Service.NetworkID, Service.TransportStreamID, Service.ServiceID,
+		LibISDB::EPGDatabase::MergeFlag::Database
+			| LibISDB::EPGDatabase::MergeFlag::MergeBasicExtended));
+
+	LibISDB::EPGDatabase::EventList MergedList;
+
+	REQUIRE(MergeDatabase.GetEventListSortedByTime(
+		Service.NetworkID, Service.TransportStreamID, Service.ServiceID, &MergedList));
+	CHECK(MergedList.size() == SrcList.size());
+
+	// SetServiceUpdated を指定していないので更新済みにはならない
+	CHECK_FALSE(MergeDatabase.IsServiceUpdated(
+		Service.NetworkID, Service.TransportStreamID, Service.ServiceID));
+
+	// 途中で切れたデータを読み込んでも失敗するだけで済むこと
+	{
+		LibISDB::MemoryStream Truncated;
+		LibISDB::EPGDatabase BrokenDatabase;
+
+		CHECK(Truncated.SetData(Stream.GetData(), Stream.GetDataSize() / 2));
+		CHECK_FALSE(LibISDB::EPGDataSerializer::DeserializeService(Truncated, BrokenDatabase));
+	}
+}
+
+
 
 
 #ifdef LIBISDB_TEST_WMAIN
