@@ -174,9 +174,23 @@ namespace LibISDB
 			MergeFlag Flags = MergeFlag::None,
 			std::optional<EventInfo::SourceIDType> SourceID = std::nullopt);
 
+		/** EIT [schedule] の受信状況 */
+		struct ScheduleStatus {
+			struct TableStatus {
+				uint32_t ReceivedSegments;   /**< セクションが1つでも来たセグメント */
+				uint32_t CompleteSegments;   /**< セクションが揃ったセグメント */
+			};
+
+			int TableCount = 0;
+			TableStatus Tables[8]{};
+		};
+
 		bool IsScheduleComplete(
 			uint16_t NetworkID, uint16_t TransportStreamID, uint16_t ServiceID,
 			bool Extended = false) const;
+		bool GetScheduleStatus(
+			uint16_t NetworkID, uint16_t TransportStreamID, uint16_t ServiceID,
+			bool Extended, ScheduleStatus *pStatus) const;
 		bool HasSchedule(
 			uint16_t NetworkID, uint16_t TransportStreamID, uint16_t ServiceID,
 			bool Extended = false) const;
@@ -209,6 +223,7 @@ namespace LibISDB
 		public:
 			void Reset();
 			bool IsComplete(int Hour, bool Extended) const;
+			void GetStatus(bool Extended, ScheduleStatus *pStatus) const;
 			bool IsTableComplete(int TableIndex, int Hour, bool Extended) const;
 			bool HasSchedule(bool Extended) const;
 			bool OnSection(const EITTable *pTable, int Hour);

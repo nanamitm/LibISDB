@@ -452,6 +452,27 @@ bool EPGDatabase::IsScheduleComplete(uint16_t NetworkID, uint16_t TransportStrea
 }
 
 
+bool EPGDatabase::GetScheduleStatus(
+	uint16_t NetworkID, uint16_t TransportStreamID, uint16_t ServiceID,
+	bool Extended, ScheduleStatus *pStatus) const
+{
+	if (pStatus == nullptr)
+		return false;
+
+	*pStatus = ScheduleStatus();
+
+	BlockLock Lock(m_Lock);
+
+	auto itService = m_ServiceMap.find(ServiceInfo(NetworkID, TransportStreamID, ServiceID));
+	if (itService == m_ServiceMap.end())
+		return false;
+
+	itService->second.Schedule.GetStatus(Extended, pStatus);
+
+	return true;
+}
+
+
 bool EPGDatabase::HasSchedule(uint16_t NetworkID, uint16_t TransportStreamID, uint16_t ServiceID, bool Extended) const
 {
 	BlockLock Lock(m_Lock);
@@ -1348,6 +1369,31 @@ bool EPGDatabase::ScheduleInfo::IsComplete(int Hour, bool Extended) const
 #endif
 
 	return true;
+}
+
+
+// どのセグメントまで受信できているかを取り出す
+// (完了と判定されないストリームで、何が足りないのかを調べるため)
+void EPGDatabase::ScheduleInfo::GetStatus(bool Extended, ScheduleStatus *pStatus) const
+{
+	const TableList &List = (Extended ? m_Extended : m_Basic);
+
+	pStatus->TableCount = List.TableCount;
+
+	for (int i = 0; i < List.TableCount; i++) {
+		const TableInfo &Table = List.Table[i];
+		ScheduleStatus::TableStatus &Status = pStatus->Tables[i];
+
+		for (int j = 0; j < 32; j++) {
+			const SegmentInfo &Segment = Table.SegmentList[j];
+
+			if (Segment.SectionCount == 0)
+				continue;
+			Status.ReceivedSegments |= 1UL << j;
+			if (Segment.SectionFlags == (1 << Segment.SectionCount) - 1)
+				Status.CompleteSegments |= 1UL << j;
+		}
+	}
 }
 
 
