@@ -419,13 +419,9 @@ void ARIBStringDecoder::DecodeChar(uint16_t Code, CodeSet Set, InternalString *p
 
 	switch (Set) {
 	case CodeSet::Kanji:
-		// 漢字コード出力
-		PutKanjiChar(Code, pDstString);
-		break;
-
 	case CodeSet::JIS_KanjiPlane1:
 		// 漢字(1面)コード出力
-		PutKanjiPlane1Char(Code, pDstString);
+		PutKanjiChar(Code, pDstString);
 		break;
 
 	case CodeSet::JIS_KanjiPlane2:
@@ -514,19 +510,9 @@ void ARIBStringDecoder::DecodeChar(uint16_t Code, CodeSet Set, InternalString *p
 
 void ARIBStringDecoder::PutKanjiChar(uint16_t Code, InternalString *pDstString)
 {
-	// 漢字集合の85区以降は追加漢字・追加記号
 	if (Code >= 0x7521)
 		return PutSymbolsChar(Code, pDstString);
 
-	PutKanjiPlane1Char(Code, pDstString);
-}
-
-
-// JIS互換漢字集合1面は85区以降が第3・第4水準漢字であり、
-// 同じ区に追加記号が置かれている漢字集合とは別物なので、
-// 追加記号への振り分けを通さずに JIS X 0213 として変換する
-void ARIBStringDecoder::PutKanjiPlane1Char(uint16_t Code, InternalString *pDstString)
-{
 	const uint8_t First = Code >> 8, Second = Code & 0x00FF;
 
 	// 全角 -> 半角英数字変換

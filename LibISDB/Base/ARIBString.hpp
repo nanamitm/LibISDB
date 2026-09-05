@@ -194,7 +194,6 @@ namespace LibISDB
 		void DecodeChar(uint16_t Code, CodeSet Set, InternalString *pDstString);
 
 		void PutKanjiChar(uint16_t Code, InternalString *pDstString);
-		void PutKanjiPlane1Char(uint16_t Code, InternalString *pDstString);
 		void PutKanjiPlane2Char(uint16_t Code, InternalString *pDstString);
 		void PutAlphanumericChar(uint16_t Code, InternalString *pDstString);
 		void PutHiraganaChar(uint16_t Code, InternalString *pDstString);
