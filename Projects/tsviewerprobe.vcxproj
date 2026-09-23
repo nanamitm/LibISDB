@@ -145,7 +145,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
       <AdditionalDependencies>LibISDBWindows.lib;strmbasd.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(LibISDBFFmpegLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -221,7 +221,7 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
       <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(LibISDBFFmpegLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release_MD|x64'">
@@ -247,21 +247,13 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <MinimumRequiredVersion>6</MinimumRequiredVersion>
       <AdditionalDependencies>LibISDBWindows.lib;strmbase.lib;fdk-aac.lib;liba52.lib;libfaad.lib;libmad.lib;Shlwapi.lib;Winmm.lib;avcodec.lib;avutil.lib;swresample.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(LibISDBFFmpegLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Samples\tsviewerprobe.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ItemGroup Condition="'$(Platform)'=='x64'">
-    <LibISDBFFmpegRuntimeDll Include="$(LibISDBFFmpegBinDir)$(LibISDBFFmpegAvcodecDll)" />
-    <LibISDBFFmpegRuntimeDll Include="$(LibISDBFFmpegBinDir)$(LibISDBFFmpegAvutilDll)" />
-    <LibISDBFFmpegRuntimeDll Include="$(LibISDBFFmpegBinDir)$(LibISDBFFmpegSwresampleDll)" />
-  </ItemGroup>
-  <Target Name="CopyLibISDBFFmpegRuntime" AfterTargets="Build" Condition="'$(Platform)'=='x64'">
-    <Copy SourceFiles="@(LibISDBFFmpegRuntimeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

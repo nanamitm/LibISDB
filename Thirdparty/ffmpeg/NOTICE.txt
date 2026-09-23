@@ -1,21 +1,28 @@
-This directory vendors prebuilt FFmpeg 9.0.1 (x64-windows) binaries and
+This directory vendors static FFmpeg 9.0.1 (x64-windows) libraries and
 headers, limited to the avcodec, avutil, and swresample components used
-by AACDecoder_FFmpeg / AACDecoder_LATM.
+by AACDecoder_FFmpeg / AACDecoder_LATM. The libraries are linked into the
+executable, so no FFmpeg DLLs are needed at run time.
 
 FFmpeg source for this version: https://github.com/FFmpeg/FFmpeg/releases/tag/n9.0.1
 
-Build: vcpkg ffmpeg port, x64-windows triplet. Configuration does not
-include --enable-gpl, --enable-version3, or --enable-nonfree, so this
-build is licensed under the GNU Lesser General Public License (LGPL),
-confirmed by calling avcodec_license(), avutil_license(), and
-swresample_license() in the bundled DLLs (all return
-"LGPL version 2.1 or later"). No additional codec libraries
+Build: build_static_msvc.cmd (build_static_msvc.sh) in this directory,
+with Visual Studio 2022 (v143) and MSYS (bash, make, nasm). Only the aac
+and aac_latm decoders are enabled. One set of libraries is built per MSVC
+runtime library:
+
+- lib/MT   /MT   (Release)
+- lib/MTd  /MTd  (Debug)
+- lib/MD   /MD   (Release_MD)
+
+The configuration does not include --enable-gpl, --enable-version3, or
+--enable-nonfree, so this build is licensed under the GNU Lesser General
+Public License (LGPL) version 2.1 or later. No additional codec libraries
 (x264, x265, fdk-aac, etc.) are linked in.
 
 Bundled library versions:
-- libavcodec 63.1.101 (avcodec-63.dll)
-- libavutil 61.1.101 (avutil-61.dll)
-- libswresample 7.1.101 (swresample-7.dll)
+- libavcodec 63.1.101
+- libavutil 61.1.101
+- libswresample 7.1.101
 
 License text: COPYING.LGPLv2.1 (this directory)
 FFmpeg source and legal info: https://ffmpeg.org/legal.html

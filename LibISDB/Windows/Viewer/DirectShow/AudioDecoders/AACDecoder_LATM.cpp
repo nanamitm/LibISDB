@@ -45,6 +45,8 @@ extern "C" {
 #pragma comment(lib, "avcodec.lib")
 #pragma comment(lib, "avutil.lib")
 #pragma comment(lib, "swresample.lib")
+// FFmpeg is linked statically; libavutil's random seed uses BCryptGenRandom
+#pragma comment(lib, "bcrypt.lib")
 
 
 namespace LibISDB::DirectShow

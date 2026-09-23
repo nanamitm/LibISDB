@@ -4,10 +4,10 @@
     <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <GenerateManifest>false</GenerateManifest>
-    <LibISDBFFmpegBinDir>$(MSBuildThisFileDirectory)..\Thirdparty\ffmpeg\bin\</LibISDBFFmpegBinDir>
-    <LibISDBFFmpegAvcodecDll>avcodec-63.dll</LibISDBFFmpegAvcodecDll>
-    <LibISDBFFmpegAvutilDll>avutil-61.dll</LibISDBFFmpegAvutilDll>
-    <LibISDBFFmpegSwresampleDll>swresample-7.dll</LibISDBFFmpegSwresampleDll>
+    <!-- Static FFmpeg libraries, one set per MSVC runtime (see Thirdparty\ffmpeg\NOTICE.txt) -->
+    <LibISDBFFmpegLibDir Condition="'$(Configuration)'=='Debug'">$(MSBuildThisFileDirectory)..\Thirdparty\ffmpeg\lib\MTd\</LibISDBFFmpegLibDir>
+    <LibISDBFFmpegLibDir Condition="'$(Configuration)'=='Release'">$(MSBuildThisFileDirectory)..\Thirdparty\ffmpeg\lib\MT\</LibISDBFFmpegLibDir>
+    <LibISDBFFmpegLibDir Condition="'$(Configuration)'=='Release_MD'">$(MSBuildThisFileDirectory)..\Thirdparty\ffmpeg\lib\MD\</LibISDBFFmpegLibDir>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(VisualStudioVersion)'=='16.0'">
     <PlatformToolset>v142</PlatformToolset>
