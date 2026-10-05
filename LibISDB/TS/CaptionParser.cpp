@@ -167,7 +167,7 @@ bool CaptionParser::ParseManagementData(const uint8_t *pData, uint32_t DataSize)
 {
 	// caption_management_data()
 
-	if (LIBISDB_TRACE_ERROR_IF(DataSize < 2 + 5 + 3))
+	if (LIBISDB_TRACE_ERROR_IF(DataSize < 2 + 3))
 		return false;
 
 	uint32_t Pos = 0;
@@ -175,6 +175,8 @@ bool CaptionParser::ParseManagementData(const uint8_t *pData, uint32_t DataSize)
 	const uint8_t TMD = pData[Pos++] >> 6;
 	if (TMD == 0b10) {
 		// OTM
+		if (DataSize - Pos < 5 + 1 + 3)
+			return false;
 		/*
 		TimeInfo OTM;
 		OTM.Hour        = GetBCD(pData[Pos + 0]);
@@ -186,13 +188,27 @@ bool CaptionParser::ParseManagementData(const uint8_t *pData, uint32_t DataSize)
 	}
 
 	const uint8_t NumLanguages = pData[Pos++];
-	if (Pos + NumLanguages * 5 + 3 > DataSize)
+	// Validate every variable-length entry before changing the language list.
+	uint32_t CheckPos = Pos;
+	for (uint8_t i = 0; i < NumLanguages; i++) {
+		if (DataSize - CheckPos < 5)
+			return false;
+		const uint8_t DMF = pData[CheckPos] & 0x0F;
+		const uint32_t LanguageSize =
+			((DMF == 0b1100) || (DMF == 0b1101) || (DMF == 0b1110)) ? 6 : 5;
+		if (DataSize - CheckPos < LanguageSize)
+			return false;
+		CheckPos += LanguageSize;
+	}
+	if (DataSize - CheckPos < 3)
+		return false;
+	if (Load24(&pData[CheckPos]) > DataSize - CheckPos - 3)
 		return false;
 
 	bool Changed = false;
 
 	for (uint8_t i = 0; i < NumLanguages; i++) {
-		LanguageInfo LangInfo;
+		LanguageInfo LangInfo{};
 
 		LangInfo.LanguageTag  = pData[Pos] >> 5;
 		LangInfo.DMF          = pData[Pos] & 0x0F;

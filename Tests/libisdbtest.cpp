@@ -388,6 +388,85 @@ TEST_CASE("BitstreamReader bounds", "[base][bitstream]")
 }
 
 
+#include "../LibISDB/TS/CaptionParser.hpp"
+
+namespace
+{
+
+void SendCaptionManagement(LibISDB::CaptionParser &Parser, const std::vector<std::uint8_t> &Data)
+{
+	// Complete PES and CRC-valid caption group, carried in one TS packet.
+	std::vector<std::uint8_t> PES(17 + Data.size() + 2, 0);
+	PES[2] = 1;
+	PES[3] = 0xBD;
+	PES[4] = static_cast<std::uint8_t>((PES.size() - 6) >> 8);
+	PES[5] = static_cast<std::uint8_t>(PES.size() - 6);
+	PES[6] = 0x80;
+	PES[9] = 0x80;
+	PES[10] = 0xFF;
+	PES[15] = static_cast<std::uint8_t>(Data.size() >> 8);
+	PES[16] = static_cast<std::uint8_t>(Data.size());
+	std::copy(Data.begin(), Data.end(), PES.begin() + 17);
+	const auto CRC = LibISDB::CRC16CCITT::Calc(PES.data() + 12, 5 + Data.size());
+	PES[PES.size() - 2] = static_cast<std::uint8_t>(CRC >> 8);
+	PES.back() = static_cast<std::uint8_t>(CRC);
+
+	std::uint8_t Raw[188] = {};
+	Raw[0] = 0x47;
+	Raw[1] = 0x40;
+	Raw[2] = 0x20;
+	Raw[3] = 0x30;
+	Raw[4] = static_cast<std::uint8_t>(183 - PES.size());
+	std::copy(PES.begin(), PES.end(), Raw + 188 - PES.size());
+	LibISDB::TSPacket Packet;
+	REQUIRE(Packet.SetData(Raw, sizeof(Raw)) == sizeof(Raw));
+	REQUIRE(Packet.ParsePacket() == LibISDB::TSPacket::ParseResult::OK);
+	Parser.StorePacket(&Packet);
+}
+
+}
+
+TEST_CASE("Caption management bounds", "[ts][caption]")
+{
+	LibISDB::CaptionParser Parser;
+	const std::vector<std::uint8_t> Valid = {
+		0, 2, 0x0C, 7, 'j', 'p', 'n', 0x10,
+		0x20, 'e', 'n', 'g', 0x10, 0, 0, 0};
+	SendCaptionManagement(Parser, Valid);
+	REQUIRE(Parser.GetLanguageCount() == 2);
+	LibISDB::CaptionParser::LanguageInfo Info{};
+	REQUIRE(Parser.GetLanguageInfo(0, &Info));
+	CHECK(Info.DC == 7);
+	CHECK(Info.LanguageCode == 0x6A706E);
+	REQUIRE(Parser.GetLanguageInfo(1, &Info));
+	CHECK(Info.DC == 0);
+	CHECK(Info.LanguageCode == 0x656E67);
+
+	SECTION("Truncated variable-length entries do not replace languages") {
+		std::vector<std::uint8_t> Broken(20, 0);
+		Broken[1] = 3;
+		Broken[2] = 0x0C;
+		Broken[8] = 0x2C;
+		Broken[14] = 0x4C;
+		SendCaptionManagement(Parser, Broken);
+		CHECK(Parser.GetLanguageCount() == 2);
+		REQUIRE(Parser.GetLanguageInfo(0, &Info));
+		CHECK(Info.LanguageCode == 0x6A706E);
+		CHECK(Info.DC == 7);
+	}
+	SECTION("Truncated OTM and unit loop are rejected") {
+		SendCaptionManagement(Parser, {0x80, 0, 0, 0, 0});
+		CHECK(Parser.GetLanguageCount() == 2);
+		auto Broken = Valid;
+		Broken[3] = 9;
+		Broken.back() = 1;
+		SendCaptionManagement(Parser, Broken);
+		REQUIRE(Parser.GetLanguageInfo(0, &Info));
+		CHECK(Info.DC == 7);
+	}
+}
+
+
 #include "../LibISDB/Base/MemoryStream.hpp"
 
 TEST_CASE("MemoryStream", "[base][stream]")
