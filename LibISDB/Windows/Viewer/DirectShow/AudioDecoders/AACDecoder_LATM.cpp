@@ -80,6 +80,7 @@ AACDecoder_LATM::AACDecoder_LATM() noexcept
 	: m_pCodecContext(nullptr)
 	, m_pPacket(nullptr)
 	, m_pFrame(nullptr)
+	, m_pSwrInputFormat(nullptr)
 	, m_pSwrContext(nullptr)
 {
 }
@@ -185,7 +186,8 @@ bool AACDecoder_LATM::OpenDecoder()
 
 	m_pPacket = ::av_packet_alloc();
 	m_pFrame = ::av_frame_alloc();
-	if ((m_pPacket == nullptr) || (m_pFrame == nullptr)) {
+	m_pSwrInputFormat = ::av_frame_alloc();
+	if ((m_pPacket == nullptr) || (m_pFrame == nullptr) || (m_pSwrInputFormat == nullptr)) {
 		CloseDecoder();
 		return false;
 	}
@@ -196,6 +198,7 @@ bool AACDecoder_LATM::OpenDecoder()
 
 void AACDecoder_LATM::CloseDecoder()
 {
+	::av_frame_free(&m_pSwrInputFormat);
 	if (m_pSwrContext != nullptr) {
 		::swr_free(&m_pSwrContext);
 		m_pSwrContext = nullptr;
@@ -314,7 +317,11 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 	if ((SrcChannels <= 0) || (SampleRate <= 0))
 		return false;
 
-	if (m_pSwrContext == nullptr) {
+	if ((m_pSwrContext == nullptr)
+			|| (m_pSwrInputFormat->sample_rate != SampleRate)
+			|| (m_pSwrInputFormat->format != m_pFrame->format)
+			|| (::av_channel_layout_compare(&m_pSwrInputFormat->ch_layout, &m_pFrame->ch_layout) != 0)) {
+		::swr_free(&m_pSwrContext);
 		AVChannelLayout OutLayout = AV_CHANNEL_LAYOUT_STEREO;
 
 		SwrContext *pSwr = nullptr;
@@ -330,6 +337,13 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 			return false;
 		}
 
+		::av_channel_layout_uninit(&m_pSwrInputFormat->ch_layout);
+		if (::av_channel_layout_copy(&m_pSwrInputFormat->ch_layout, &m_pFrame->ch_layout) < 0) {
+			::swr_free(&pSwr);
+			return false;
+		}
+		m_pSwrInputFormat->sample_rate = SampleRate;
+		m_pSwrInputFormat->format = m_pFrame->format;
 		m_pSwrContext = pSwr;
 	}
 

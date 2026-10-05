@@ -748,7 +748,7 @@ TEST_CASE("EPGDataSerializer", "[epg][serialize]")
 namespace
 {
 
-std::vector<std::uint8_t> MakeSilentLOASFrame(unsigned int FrequencyIndex = 3)
+std::vector<std::uint8_t> MakeSilentLOASFrame(unsigned int FrequencyIndex = 3, unsigned int Channels = 2)
 {
 	std::vector<std::uint8_t> Body;
 	unsigned int BitPos = 0;
@@ -768,16 +768,30 @@ std::vector<std::uint8_t> MakeSilentLOASFrame(unsigned int FrequencyIndex = 3)
 	Bits(0, 3); // numLayer
 	Bits(2, 5); // AAC LC
 	Bits(FrequencyIndex, 4);
-	Bits(2, 4); // stereo
+	Bits(Channels, 4);
 	Bits(0, 3); // GASpecificConfig
 	Bits(0, 3); // frameLengthType
 	Bits(255, 8); // latmBufferFullness
 	Bits(0, 1); // otherDataPresent
 	Bits(0, 1); // crcCheckPresent
-	Bits(6, 8); // payload length
-	// Silent AAC LC channel pair and ID_END.
-	for (const std::uint8_t Byte : {0x21, 0x10, 0x04, 0x60, 0x8C, 0x1C})
-		Bits(Byte, 8);
+	if (Channels == 1) {
+		Bits(4, 8); // payload length
+		Bits(0, 3); // ID_SCE
+		Bits(0, 4); // element_instance_tag
+		Bits(100, 8); // global_gain
+		Bits(0, 1); // ics_reserved_bit
+		Bits(0, 2); // ONLY_LONG_SEQUENCE
+		Bits(0, 1); // window_shape
+		Bits(0, 6); // max_sfb: no spectral bands
+		Bits(0, 1); // predictor_data_present
+		Bits(0, 3); // pulse, TNS and gain control flags
+		Bits(7, 3); // ID_END
+	} else {
+		Bits(6, 8); // payload length
+		// Silent AAC LC channel pair and ID_END.
+		for (const std::uint8_t Byte : {0x21, 0x10, 0x04, 0x60, 0x8C, 0x1C})
+			Bits(Byte, 8);
+	}
 	std::vector<std::uint8_t> Frame = {
 		0x56, static_cast<std::uint8_t>(0xE0 | (Body.size() >> 8)),
 		static_cast<std::uint8_t>(Body.size())};
@@ -819,6 +833,25 @@ TEST_CASE("LATM frame consumption", "[windows][audio][latm]")
 			CHECK(OK == (Pos + 1 == Frame.size()));
 		}
 		CHECK(Info.SampleCount == 1024);
+	}
+}
+
+TEST_CASE("LATM input format changes", "[windows][audio][latm]")
+{
+	LibISDB::DirectShow::AACDecoder_LATM Decoder;
+	REQUIRE(Decoder.Open());
+	LibISDB::DirectShow::AudioDecoder::DecodeFrameInfo Info;
+	for (const unsigned int Channels : {2U, 1U, 2U}) {
+		for (const unsigned int FrequencyIndex : {3U, 4U, 3U}) {
+			const auto Frame = MakeSilentLOASFrame(FrequencyIndex, Channels);
+			std::size_t Size = Frame.size();
+			REQUIRE(Decoder.Decode(Frame.data(), &Size, &Info));
+			CHECK(Size == Frame.size());
+			CHECK(Info.SampleCount == 1024);
+			CHECK(Info.Info.Frequency == (FrequencyIndex == 3 ? 48000 : 44100));
+			CHECK(Info.Info.ChannelCount == 2);
+			CHECK(Info.Info.OriginalChannelCount == Channels);
+		}
 	}
 }
 
