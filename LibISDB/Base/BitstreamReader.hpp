@@ -40,6 +40,7 @@ namespace LibISDB
 		size_t GetPos() const noexcept { return m_BitPos; }
 		uint32_t GetBits(size_t Bits) noexcept;
 		bool GetFlag() noexcept;
+		// エラー時は -1 を返すが、GetSE_V() では有効な値と区別できないため IsOverrun() で判定する
 		int GetUE_V() noexcept;
 		int GetSE_V() noexcept;
 		bool Skip(size_t Bits) noexcept;

@@ -905,16 +905,18 @@ bool EPGDataSerializer::DeserializeService(
 		if (!R.ReadChunkHeader(&ChunkTag, &Size))
 			return false;
 
-		if (ChunkTag == Tag::End)
+		if (ChunkTag == Tag::End) {
+			if ((Size != 0) || (EventList.size() != Header.EventCount))
+				return false;
 			break;
+		}
 
 		if (ChunkTag == Tag::Event) {
+			if (EventList.size() >= Header.EventCount)
+				return false;
 			EventInfo Event;
 
 			if (!DeserializeEvent(R, ServiceInfo, &Event))
-				return false;
-
-			if (EventList.size() >= MAX_EVENT_COUNT)
 				return false;
 
 			EventList.push_back(std::move(Event));

@@ -82,7 +82,12 @@ int BitstreamReader::GetUE_V() noexcept
 
 	if (Length < 0)
 		return -1;
-	return (1 << (Length >> 1)) + Info - 1;
+	const uint32_t Value = (1U << (Length >> 1)) + static_cast<uint32_t>(Info) - 1;
+	if (Value > static_cast<uint32_t>(std::numeric_limits<int>::max())) {
+		MarkOverrun();
+		return -1;
+	}
+	return static_cast<int>(Value);
 }
 
 
@@ -114,6 +119,11 @@ bool BitstreamReader::Skip(size_t Bits) noexcept
 
 int BitstreamReader::GetVLCSymbol(int *pInfo) noexcept
 {
+	if (m_BitPos >= m_BitSize) {
+		MarkOverrun();
+		return -1;
+	}
+
 	const uint8_t *p = &m_pBits[m_BitPos >> 3];
 	const uint8_t *pEnd = m_pBits + (m_BitSize >> 3);
 	int Shift = static_cast<int>(7 - (m_BitPos & 7));
@@ -122,6 +132,10 @@ int BitstreamReader::GetVLCSymbol(int *pInfo) noexcept
 
 	while (((*p >> Shift) & 0x01) == 0) {
 		Length++;
+		if (Length > 31) {
+			MarkOverrun();
+			return -1;
+		}
 		BitCount++;
 		Shift--;
 		if (Shift < 0) {

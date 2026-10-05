@@ -352,6 +352,158 @@ TEST_CASE("DateTime", "[base][time]")
 }
 
 
+#include "../LibISDB/Base/BitstreamReader.hpp"
+
+TEST_CASE("BitstreamReader bounds", "[base][bitstream]")
+{
+	SECTION("Empty and exhausted input") {
+		LibISDB::BitstreamReader Empty(nullptr, 0);
+		CHECK(Empty.GetUE_V() == -1);
+		CHECK(Empty.IsOverrun());
+		CHECK(Empty.GetSE_V() == -1);
+
+		const std::uint8_t Data[] = {0x80};
+		LibISDB::BitstreamReader Reader(Data, sizeof(Data));
+		CHECK(Reader.GetBits(8) == 0x80);
+		CHECK(Reader.GetUE_V() == -1);
+		CHECK(Reader.IsOverrun());
+	}
+	SECTION("Truncated and oversized codes") {
+		const std::uint8_t Data[] = {0x00, 0x00, 0x00, 0x00, 0x80};
+		LibISDB::BitstreamReader Truncated(Data, 1);
+		CHECK(Truncated.GetUE_V() == -1);
+		CHECK(Truncated.IsOverrun());
+		LibISDB::BitstreamReader Oversized(Data, sizeof(Data));
+		CHECK(Oversized.GetSE_V() == -1);
+		CHECK(Oversized.IsOverrun());
+	}
+	SECTION("Valid unsigned and signed codes") {
+		const std::uint8_t Data[] = {0xA6}; // 1, 010, 011
+		LibISDB::BitstreamReader Reader(Data, sizeof(Data));
+		CHECK(Reader.GetUE_V() == 0);
+		CHECK(Reader.GetSE_V() == 1);
+		CHECK(Reader.GetSE_V() == -1);
+		CHECK_FALSE(Reader.IsOverrun());
+	}
+}
+
+
+#include "../LibISDB/MediaParsers/H264Parser.hpp"
+
+TEST_CASE("H264 SPS rejects truncated Exp-Golomb fields", "[media][h264]")
+{
+	// Baseline 320x240 SPS followed by an access unit delimiter.
+	const std::uint8_t Valid[] = {
+		0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x1E, 0xDA, 0x05, 0x07, 0xE4,
+		0x00, 0x00, 0x01, 0x09, 0xF0};
+	LibISDB::H264AccessUnit AccessUnit;
+	AccessUnit.SetData(Valid, sizeof(Valid));
+	REQUIRE(AccessUnit.ParseHeader());
+	CHECK(AccessUnit.GetHorizontalSize() == 320);
+	CHECK(AccessUnit.GetVerticalSize() == 240);
+
+	// The SPS ends in the middle of pic_width_in_mbs_minus1.
+	const std::uint8_t Truncated[] = {
+		0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x1E, 0xDA, 0x05,
+		0x00, 0x00, 0x01, 0x09, 0xF0};
+	LibISDB::H264AccessUnit Broken;
+	Broken.SetData(Truncated, sizeof(Truncated));
+	CHECK_FALSE(Broken.ParseHeader());
+}
+
+
+#include "../LibISDB/TS/CaptionParser.hpp"
+
+namespace
+{
+
+void SendCaptionManagement(
+	LibISDB::CaptionParser &Parser, const std::vector<std::uint8_t> &Data, std::uint8_t Version = 0)
+{
+	// Complete PES and CRC-valid caption group, carried in one TS packet.
+	std::vector<std::uint8_t> PES(17 + Data.size() + 2, 0);
+	PES[2] = 1;
+	PES[3] = 0xBD;
+	PES[4] = static_cast<std::uint8_t>((PES.size() - 6) >> 8);
+	PES[5] = static_cast<std::uint8_t>(PES.size() - 6);
+	PES[6] = 0x80;
+	PES[9] = 0x80;
+	PES[10] = 0xFF;
+	PES[12] = Version; // data_group_id 0 (management data)
+	PES[15] = static_cast<std::uint8_t>(Data.size() >> 8);
+	PES[16] = static_cast<std::uint8_t>(Data.size());
+	std::copy(Data.begin(), Data.end(), PES.begin() + 17);
+	const auto CRC = LibISDB::CRC16CCITT::Calc(PES.data() + 12, 5 + Data.size());
+	PES[PES.size() - 2] = static_cast<std::uint8_t>(CRC >> 8);
+	PES.back() = static_cast<std::uint8_t>(CRC);
+
+	std::uint8_t Raw[188] = {};
+	Raw[0] = 0x47;
+	Raw[1] = 0x40;
+	Raw[2] = 0x20;
+	Raw[3] = 0x30;
+	Raw[4] = static_cast<std::uint8_t>(183 - PES.size());
+	std::copy(PES.begin(), PES.end(), Raw + 188 - PES.size());
+	LibISDB::TSPacket Packet;
+	REQUIRE(Packet.SetData(Raw, sizeof(Raw)) == sizeof(Raw));
+	REQUIRE(Packet.ParsePacket() == LibISDB::TSPacket::ParseResult::OK);
+	Parser.StorePacket(&Packet);
+}
+
+}
+
+TEST_CASE("Caption management bounds", "[ts][caption]")
+{
+	LibISDB::CaptionParser Parser;
+	const std::vector<std::uint8_t> Valid = {
+		0, 2, 0x0C, 7, 'j', 'p', 'n', 0x10,
+		0x20, 'e', 'n', 'g', 0x10, 0, 0, 0};
+	SendCaptionManagement(Parser, Valid);
+	REQUIRE(Parser.GetLanguageCount() == 2);
+	LibISDB::CaptionParser::LanguageInfo Info{};
+	REQUIRE(Parser.GetLanguageInfo(0, &Info));
+	CHECK(Info.DC == 7);
+	CHECK(Info.LanguageCode == 0x6A706E);
+	REQUIRE(Parser.GetLanguageInfo(1, &Info));
+	CHECK(Info.DC == 0);
+	CHECK(Info.LanguageCode == 0x656E67);
+
+	SECTION("Truncated variable-length entries do not replace languages") {
+		std::vector<std::uint8_t> Broken(20, 0);
+		Broken[1] = 3;
+		Broken[2] = 0x0C;
+		Broken[8] = 0x2C;
+		Broken[14] = 0x4C;
+		SendCaptionManagement(Parser, Broken);
+		CHECK(Parser.GetLanguageCount() == 2);
+		REQUIRE(Parser.GetLanguageInfo(0, &Info));
+		CHECK(Info.LanguageCode == 0x6A706E);
+		CHECK(Info.DC == 7);
+	}
+	SECTION("Truncated OTM and unit loop are rejected") {
+		SendCaptionManagement(Parser, {0x80, 0, 0, 0, 0});
+		CHECK(Parser.GetLanguageCount() == 2);
+		auto Broken = Valid;
+		Broken[3] = 9;
+		Broken.back() = 1;
+		SendCaptionManagement(Parser, Broken);
+		REQUIRE(Parser.GetLanguageInfo(0, &Info));
+		CHECK(Info.DC == 7);
+	}
+	SECTION("Invalid data with a new version does not clear languages") {
+		SendCaptionManagement(Parser, {0x80, 0, 0, 0, 0}, 1);
+		CHECK(Parser.GetLanguageCount() == 2);
+
+		const std::vector<std::uint8_t> Updated = {
+			0, 1, 0x20, 'e', 'n', 'g', 0x10, 0, 0, 0};
+		SendCaptionManagement(Parser, Updated, 1);
+		REQUIRE(Parser.GetLanguageCount() == 1);
+		REQUIRE(Parser.GetLanguageInfo(0, &Info));
+		CHECK(Info.LanguageCode == 0x656E67);
+	}
+}
+
+
 #include "../LibISDB/Base/MemoryStream.hpp"
 
 TEST_CASE("MemoryStream", "[base][stream]")
@@ -624,6 +776,198 @@ TEST_CASE("EPGDataSerializer", "[epg][serialize]")
 }
 
 
+
+
+TEST_CASE("EPG import validates counts before replacing data", "[epg][serialize]")
+{
+	const LibISDB::EPGDatabase::ServiceInfo Service(0x0004, 0x4010, 0x00E4);
+	LibISDB::EPGDatabase Source, Target;
+	LibISDB::EPGDatabase::EventList Events;
+	Events.push_back(MakeTestEvent(0x1000, 1000));
+	REQUIRE(Source.SetServiceEventList(Service, std::move(Events)));
+	Events.clear();
+	Events.push_back(MakeTestEvent(0x2000, 2000));
+	REQUIRE(Target.SetServiceEventList(Service, std::move(Events)));
+	LibISDB::MemoryStream Serialized;
+	REQUIRE(LibISDB::EPGDataSerializer::SerializeService(
+		Source, Service.NetworkID, Service.TransportStreamID, Service.ServiceID, Serialized));
+	auto Data = Serialized.DetachBuffer();
+
+	// Service file layout: 32-byte header (event count at offset 20, little endian),
+	// then chunks of a 1-byte tag and a 4-byte little-endian body size.
+	constexpr std::size_t HeaderSize = LibISDB::EPGDataSerializer::HeaderSize;
+	constexpr std::size_t EventCountOffset = 20;
+	constexpr std::uint8_t EndTag = 0x01;
+	constexpr std::size_t ChunkSizeLength = 4;
+	const std::initializer_list<std::uint8_t> EmptyEndChunk = {EndTag, 0, 0, 0, 0};
+	REQUIRE(Data.size() > HeaderSize + std::size(EmptyEndChunk));
+	REQUIRE(Data[EventCountOffset] == 1);
+	REQUIRE(Data[Data.size() - std::size(EmptyEndChunk)] == EndTag);
+
+	enum class Expect { Rejected, Cleared, Imported };
+	Expect Expected = Expect::Rejected;
+
+	SECTION("Declared count is lower than actual") {
+		Data[EventCountOffset] = 0;
+	}
+	SECTION("Declared count is higher than actual") {
+		Data[EventCountOffset] = 2;
+	}
+	SECTION("Early end cannot clear existing events") {
+		Data.resize(HeaderSize);
+		Data.insert(Data.end(), EmptyEndChunk);
+	}
+	SECTION("End chunk cannot declare a missing body") {
+		Data[Data.size() - ChunkSizeLength] = 1;
+	}
+	SECTION("An empty service can intentionally clear events") {
+		Data.resize(HeaderSize);
+		Data[EventCountOffset] = 0;
+		Data.insert(Data.end(), EmptyEndChunk);
+		Expected = Expect::Cleared;
+	}
+	SECTION("Unknown chunks remain forward compatible") {
+		Data.insert(Data.begin() + HeaderSize, {0xFF, 2, 0, 0, 0, 0x12, 0x34});
+		Expected = Expect::Imported;
+	}
+
+	LibISDB::MemoryStream Input(std::move(Data));
+	CHECK(LibISDB::EPGDataSerializer::DeserializeService(Input, Target) == (Expected != Expect::Rejected));
+	LibISDB::EPGDatabase::EventList Result;
+	REQUIRE(Target.GetEventListSortedByTime(
+		Service.NetworkID, Service.TransportStreamID, Service.ServiceID, &Result));
+	switch (Expected) {
+	case Expect::Rejected:
+		REQUIRE(Result.size() == 1);
+		CHECK(Result[0].EventID == 0x2000);
+		CHECK(Result[0].UpdatedTime == 2000);
+		break;
+	case Expect::Cleared:
+		CHECK(Result.empty());
+		break;
+	case Expect::Imported:
+		REQUIRE(Result.size() == 1);
+		CHECK(Result[0].EventID == 0x1000);
+		break;
+	}
+}
+
+
+#if defined(LIBISDB_WINDOWS) && defined(LIBISDB_HAS_FFMPEG_AAC)
+
+#include "../LibISDB/Windows/Viewer/DirectShow/AudioDecoders/AACDecoder_LATM.hpp"
+
+namespace
+{
+
+std::vector<std::uint8_t> MakeSilentLOASFrame(unsigned int FrequencyIndex = 3, unsigned int Channels = 2)
+{
+	std::vector<std::uint8_t> Body;
+	unsigned int BitPos = 0;
+	const auto Bits = [&](unsigned int Value, unsigned int Count) {
+		for (unsigned int i = Count; i > 0; i--) {
+			if (BitPos % 8 == 0)
+				Body.push_back(0);
+			Body.back() |= ((Value >> (i - 1)) & 1) << (7 - BitPos % 8);
+			BitPos++;
+		}
+	};
+	Bits(0, 1); // useSameStreamMux
+	Bits(0, 1); // audioMuxVersion
+	Bits(1, 1); // allStreamsSameTimeFraming
+	Bits(0, 6); // numSubFrames
+	Bits(0, 4); // numProgram
+	Bits(0, 3); // numLayer
+	Bits(2, 5); // AAC LC
+	Bits(FrequencyIndex, 4);
+	Bits(Channels, 4);
+	Bits(0, 3); // GASpecificConfig
+	Bits(0, 3); // frameLengthType
+	Bits(255, 8); // latmBufferFullness
+	Bits(0, 1); // otherDataPresent
+	Bits(0, 1); // crcCheckPresent
+	if (Channels == 1) {
+		Bits(4, 8); // payload length
+		Bits(0, 3); // ID_SCE
+		Bits(0, 4); // element_instance_tag
+		Bits(100, 8); // global_gain
+		Bits(0, 1); // ics_reserved_bit
+		Bits(0, 2); // ONLY_LONG_SEQUENCE
+		Bits(0, 1); // window_shape
+		Bits(0, 6); // max_sfb: no spectral bands
+		Bits(0, 1); // predictor_data_present
+		Bits(0, 3); // pulse, TNS and gain control flags
+		Bits(7, 3); // ID_END
+	} else {
+		Bits(6, 8); // payload length
+		// Silent AAC LC channel pair and ID_END.
+		for (const std::uint8_t Byte : {0x21, 0x10, 0x04, 0x60, 0x8C, 0x1C})
+			Bits(Byte, 8);
+	}
+	std::vector<std::uint8_t> Frame = {
+		0x56, static_cast<std::uint8_t>(0xE0 | (Body.size() >> 8)),
+		static_cast<std::uint8_t>(Body.size())};
+	Frame.insert(Frame.end(), Body.begin(), Body.end());
+	return Frame;
+}
+
+}
+
+TEST_CASE("LATM frame consumption", "[windows][audio][latm]")
+{
+	LibISDB::DirectShow::AACDecoder_LATM Decoder;
+	REQUIRE(Decoder.Open());
+	const auto Frame = MakeSilentLOASFrame();
+	LibISDB::DirectShow::AudioDecoder::DecodeFrameInfo Info;
+	SECTION("All frames in one input are decoded immediately") {
+		std::vector<std::uint8_t> Input;
+		for (int i = 0; i < 3; i++)
+			Input.insert(Input.end(), Frame.begin(), Frame.end());
+		std::size_t Pos = 0;
+		int Decoded = 0;
+		while (Pos < Input.size()) {
+			std::size_t Size = Input.size() - Pos;
+			REQUIRE(Decoder.Decode(Input.data() + Pos, &Size, &Info));
+			REQUIRE(Size == Frame.size());
+			CHECK(Info.SampleCount == 1024);
+			CHECK(Info.Info.Frequency == 48000);
+			CHECK(Info.Info.ChannelCount == 2);
+			Pos += Size;
+			Decoded++;
+		}
+		CHECK(Decoded == 3);
+	}
+	SECTION("Frame fragments survive input boundaries") {
+		for (std::size_t Pos = 0; Pos < Frame.size(); Pos++) {
+			std::size_t Size = 1;
+			const bool OK = Decoder.Decode(Frame.data() + Pos, &Size, &Info);
+			CHECK(Size == 1);
+			CHECK(OK == (Pos + 1 == Frame.size()));
+		}
+		CHECK(Info.SampleCount == 1024);
+	}
+}
+
+TEST_CASE("LATM input format changes", "[windows][audio][latm]")
+{
+	LibISDB::DirectShow::AACDecoder_LATM Decoder;
+	REQUIRE(Decoder.Open());
+	LibISDB::DirectShow::AudioDecoder::DecodeFrameInfo Info;
+	for (const unsigned int Channels : {2U, 1U, 2U}) {
+		for (const unsigned int FrequencyIndex : {3U, 4U, 3U}) {
+			const auto Frame = MakeSilentLOASFrame(FrequencyIndex, Channels);
+			std::size_t Size = Frame.size();
+			REQUIRE(Decoder.Decode(Frame.data(), &Size, &Info));
+			CHECK(Size == Frame.size());
+			CHECK(Info.SampleCount == 1024);
+			CHECK(Info.Info.Frequency == (FrequencyIndex == 3 ? 48000 : 44100));
+			CHECK(Info.Info.ChannelCount == 2);
+			CHECK(Info.Info.OriginalChannelCount == Channels);
+		}
+	}
+}
+
+#endif
 
 
 #ifdef LIBISDB_TEST_WMAIN

@@ -103,7 +103,7 @@ namespace LibISDB
 	// PESParser::PacketHandler
 		void OnPESPacket(const PESParser *pParser, const PESPacket *pPacket) override;
 
-		bool ParseManagementData(const uint8_t *pData, uint32_t DataSize);
+		bool ParseManagementData(const uint8_t *pData, uint32_t DataSize, uint8_t DataGroupVersion);
 		bool ParseCaptionData(const uint8_t *pData, uint32_t DataSize, uint8_t DataGroupIndex);
 		bool ParseUnitData(const uint8_t *pData, uint32_t *pDataSize, uint8_t DataGroupIndex);
 		bool ParseDRCSUnitData(const uint8_t *pData, uint32_t DataSize);

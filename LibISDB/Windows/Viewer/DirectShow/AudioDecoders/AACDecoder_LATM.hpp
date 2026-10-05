@@ -82,6 +82,7 @@ namespace LibISDB::DirectShow
 		AVCodecContext *m_pCodecContext;
 		AVPacket *m_pPacket;
 		AVFrame *m_pFrame;
+		AVFrame *m_pSwrInputFormat;
 		SwrContext *m_pSwrContext;
 		std::vector<uint8_t> m_LOASBuffer;
 		DataBuffer m_PCMBuffer;
