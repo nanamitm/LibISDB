@@ -792,46 +792,63 @@ TEST_CASE("EPG import validates counts before replacing data", "[epg][serialize]
 	REQUIRE(LibISDB::EPGDataSerializer::SerializeService(
 		Source, Service.NetworkID, Service.TransportStreamID, Service.ServiceID, Serialized));
 	auto Data = Serialized.DetachBuffer();
-	bool Valid = false;
+
+	// Service file layout: 32-byte header (event count at offset 20, little endian),
+	// then chunks of a 1-byte tag and a 4-byte little-endian body size.
+	constexpr std::size_t HeaderSize = LibISDB::EPGDataSerializer::HeaderSize;
+	constexpr std::size_t EventCountOffset = 20;
+	constexpr std::uint8_t EndTag = 0x01;
+	constexpr std::size_t ChunkSizeLength = 4;
+	const std::initializer_list<std::uint8_t> EmptyEndChunk = {EndTag, 0, 0, 0, 0};
+	REQUIRE(Data.size() > HeaderSize + std::size(EmptyEndChunk));
+	REQUIRE(Data[EventCountOffset] == 1);
+	REQUIRE(Data[Data.size() - std::size(EmptyEndChunk)] == EndTag);
+
+	enum class Expect { Rejected, Cleared, Imported };
+	Expect Expected = Expect::Rejected;
 
 	SECTION("Declared count is lower than actual") {
-		Data[20] = 0;
+		Data[EventCountOffset] = 0;
 	}
 	SECTION("Declared count is higher than actual") {
-		Data[20] = 2;
+		Data[EventCountOffset] = 2;
 	}
 	SECTION("Early end cannot clear existing events") {
-		Data.resize(32);
-		Data.insert(Data.end(), {1, 0, 0, 0, 0});
+		Data.resize(HeaderSize);
+		Data.insert(Data.end(), EmptyEndChunk);
 	}
 	SECTION("End chunk cannot declare a missing body") {
-		Data[Data.size() - 4] = 1;
+		Data[Data.size() - ChunkSizeLength] = 1;
 	}
 	SECTION("An empty service can intentionally clear events") {
-		Data.resize(32);
-		Data[20] = 0;
-		Data.insert(Data.end(), {1, 0, 0, 0, 0});
-		Valid = true;
+		Data.resize(HeaderSize);
+		Data[EventCountOffset] = 0;
+		Data.insert(Data.end(), EmptyEndChunk);
+		Expected = Expect::Cleared;
 	}
 	SECTION("Unknown chunks remain forward compatible") {
-		Data.insert(Data.begin() + 32, {0xFF, 2, 0, 0, 0, 0x12, 0x34});
-		Valid = true;
+		Data.insert(Data.begin() + HeaderSize, {0xFF, 2, 0, 0, 0, 0x12, 0x34});
+		Expected = Expect::Imported;
 	}
 
 	LibISDB::MemoryStream Input(std::move(Data));
-	CHECK(LibISDB::EPGDataSerializer::DeserializeService(Input, Target) == Valid);
+	CHECK(LibISDB::EPGDataSerializer::DeserializeService(Input, Target) == (Expected != Expect::Rejected));
 	LibISDB::EPGDatabase::EventList Result;
 	REQUIRE(Target.GetEventListSortedByTime(
 		Service.NetworkID, Service.TransportStreamID, Service.ServiceID, &Result));
-	if (!Valid) {
+	switch (Expected) {
+	case Expect::Rejected:
 		REQUIRE(Result.size() == 1);
 		CHECK(Result[0].EventID == 0x2000);
 		CHECK(Result[0].UpdatedTime == 2000);
-	} else if (Input.GetSize() == 37) {
+		break;
+	case Expect::Cleared:
 		CHECK(Result.empty());
-	} else {
+		break;
+	case Expect::Imported:
 		REQUIRE(Result.size() == 1);
 		CHECK(Result[0].EventID == 0x1000);
+		break;
 	}
 }
 
