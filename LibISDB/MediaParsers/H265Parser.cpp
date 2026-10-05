@@ -298,6 +298,10 @@ bool H265AccessUnit::ParseHeader()
 #endif
 			}
 
+			// GetUE_V()/GetSE_V() のエラー値は有効な値と区別できないため、まとめて確認する
+			if (Bitstream.IsOverrun())
+				return false;
+
 			m_FoundSPS = true;
 		} else if (NALUnitType == 0x23) {
 			// Access unit delimiter

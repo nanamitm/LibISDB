@@ -388,6 +388,30 @@ TEST_CASE("BitstreamReader bounds", "[base][bitstream]")
 }
 
 
+#include "../LibISDB/MediaParsers/H264Parser.hpp"
+
+TEST_CASE("H264 SPS rejects truncated Exp-Golomb fields", "[media][h264]")
+{
+	// Baseline 320x240 SPS followed by an access unit delimiter.
+	const std::uint8_t Valid[] = {
+		0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x1E, 0xDA, 0x05, 0x07, 0xE4,
+		0x00, 0x00, 0x01, 0x09, 0xF0};
+	LibISDB::H264AccessUnit AccessUnit;
+	AccessUnit.SetData(Valid, sizeof(Valid));
+	REQUIRE(AccessUnit.ParseHeader());
+	CHECK(AccessUnit.GetHorizontalSize() == 320);
+	CHECK(AccessUnit.GetVerticalSize() == 240);
+
+	// The SPS ends in the middle of pic_width_in_mbs_minus1.
+	const std::uint8_t Truncated[] = {
+		0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x1E, 0xDA, 0x05,
+		0x00, 0x00, 0x01, 0x09, 0xF0};
+	LibISDB::H264AccessUnit Broken;
+	Broken.SetData(Truncated, sizeof(Truncated));
+	CHECK_FALSE(Broken.ParseHeader());
+}
+
+
 #include "../LibISDB/TS/CaptionParser.hpp"
 
 namespace
