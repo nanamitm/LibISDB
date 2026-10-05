@@ -146,24 +146,25 @@ void CaptionParser::OnPESPacket(const PESParser *pParser, const PESPacket *pPack
 	}
 	Pos += 5;
 
-	if (m_DataGroupVersion != DataGroupVersion) {
-		m_LanguageList.clear();
-		m_DataGroupVersion = DataGroupVersion;
-	}
-
 	m_DataGroupID = DataGroupID;
 
 	if ((DataGroupID == 0x00) || (DataGroupID == 0x20)) {
 		// 字幕管理データ
-		ParseManagementData(&pData[Pos], DataGroupSize);
+		// (不正なデータで言語リストが消えないよう、バージョン変更の反映は検証後に行う)
+		ParseManagementData(&pData[Pos], DataGroupSize, DataGroupVersion);
 	} else {
+		if (m_DataGroupVersion != DataGroupVersion) {
+			m_LanguageList.clear();
+			m_DataGroupVersion = DataGroupVersion;
+		}
+
 		// 字幕データ
 		ParseCaptionData(&pData[Pos], DataGroupSize, (DataGroupID & 0x1F));
 	}
 }
 
 
-bool CaptionParser::ParseManagementData(const uint8_t *pData, uint32_t DataSize)
+bool CaptionParser::ParseManagementData(const uint8_t *pData, uint32_t DataSize, uint8_t DataGroupVersion)
 {
 	// caption_management_data()
 
@@ -204,6 +205,11 @@ bool CaptionParser::ParseManagementData(const uint8_t *pData, uint32_t DataSize)
 		return false;
 	if (Load24(&pData[CheckPos]) > DataSize - CheckPos - 3)
 		return false;
+
+	if (m_DataGroupVersion != DataGroupVersion) {
+		m_LanguageList.clear();
+		m_DataGroupVersion = DataGroupVersion;
+	}
 
 	bool Changed = false;
 

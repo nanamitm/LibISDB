@@ -417,7 +417,8 @@ TEST_CASE("H264 SPS rejects truncated Exp-Golomb fields", "[media][h264]")
 namespace
 {
 
-void SendCaptionManagement(LibISDB::CaptionParser &Parser, const std::vector<std::uint8_t> &Data)
+void SendCaptionManagement(
+	LibISDB::CaptionParser &Parser, const std::vector<std::uint8_t> &Data, std::uint8_t Version = 0)
 {
 	// Complete PES and CRC-valid caption group, carried in one TS packet.
 	std::vector<std::uint8_t> PES(17 + Data.size() + 2, 0);
@@ -428,6 +429,7 @@ void SendCaptionManagement(LibISDB::CaptionParser &Parser, const std::vector<std
 	PES[6] = 0x80;
 	PES[9] = 0x80;
 	PES[10] = 0xFF;
+	PES[12] = Version; // data_group_id 0 (management data)
 	PES[15] = static_cast<std::uint8_t>(Data.size() >> 8);
 	PES[16] = static_cast<std::uint8_t>(Data.size());
 	std::copy(Data.begin(), Data.end(), PES.begin() + 17);
@@ -487,6 +489,17 @@ TEST_CASE("Caption management bounds", "[ts][caption]")
 		SendCaptionManagement(Parser, Broken);
 		REQUIRE(Parser.GetLanguageInfo(0, &Info));
 		CHECK(Info.DC == 7);
+	}
+	SECTION("Invalid data with a new version does not clear languages") {
+		SendCaptionManagement(Parser, {0x80, 0, 0, 0, 0}, 1);
+		CHECK(Parser.GetLanguageCount() == 2);
+
+		const std::vector<std::uint8_t> Updated = {
+			0, 1, 0x20, 'e', 'n', 'g', 0x10, 0, 0, 0};
+		SendCaptionManagement(Parser, Updated, 1);
+		REQUIRE(Parser.GetLanguageCount() == 1);
+		REQUIRE(Parser.GetLanguageInfo(0, &Info));
+		CHECK(Info.LanguageCode == 0x656E67);
 	}
 }
 
