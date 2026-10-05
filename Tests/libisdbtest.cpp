@@ -352,6 +352,42 @@ TEST_CASE("DateTime", "[base][time]")
 }
 
 
+#include "../LibISDB/Base/BitstreamReader.hpp"
+
+TEST_CASE("BitstreamReader bounds", "[base][bitstream]")
+{
+	SECTION("Empty and exhausted input") {
+		LibISDB::BitstreamReader Empty(nullptr, 0);
+		CHECK(Empty.GetUE_V() == -1);
+		CHECK(Empty.IsOverrun());
+		CHECK(Empty.GetSE_V() == -1);
+
+		const std::uint8_t Data[] = {0x80};
+		LibISDB::BitstreamReader Reader(Data, sizeof(Data));
+		CHECK(Reader.GetBits(8) == 0x80);
+		CHECK(Reader.GetUE_V() == -1);
+		CHECK(Reader.IsOverrun());
+	}
+	SECTION("Truncated and oversized codes") {
+		const std::uint8_t Data[] = {0x00, 0x00, 0x00, 0x00, 0x80};
+		LibISDB::BitstreamReader Truncated(Data, 1);
+		CHECK(Truncated.GetUE_V() == -1);
+		CHECK(Truncated.IsOverrun());
+		LibISDB::BitstreamReader Oversized(Data, sizeof(Data));
+		CHECK(Oversized.GetSE_V() == -1);
+		CHECK(Oversized.IsOverrun());
+	}
+	SECTION("Valid unsigned and signed codes") {
+		const std::uint8_t Data[] = {0xA6}; // 1, 010, 011
+		LibISDB::BitstreamReader Reader(Data, sizeof(Data));
+		CHECK(Reader.GetUE_V() == 0);
+		CHECK(Reader.GetSE_V() == 1);
+		CHECK(Reader.GetSE_V() == -1);
+		CHECK_FALSE(Reader.IsOverrun());
+	}
+}
+
+
 #include "../LibISDB/Base/MemoryStream.hpp"
 
 TEST_CASE("MemoryStream", "[base][stream]")
