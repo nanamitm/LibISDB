@@ -741,6 +741,64 @@ TEST_CASE("EPGDataSerializer", "[epg][serialize]")
 
 
 
+TEST_CASE("EPG import validates counts before replacing data", "[epg][serialize]")
+{
+	const LibISDB::EPGDatabase::ServiceInfo Service(0x0004, 0x4010, 0x00E4);
+	LibISDB::EPGDatabase Source, Target;
+	LibISDB::EPGDatabase::EventList Events;
+	Events.push_back(MakeTestEvent(0x1000, 1000));
+	REQUIRE(Source.SetServiceEventList(Service, std::move(Events)));
+	Events.clear();
+	Events.push_back(MakeTestEvent(0x2000, 2000));
+	REQUIRE(Target.SetServiceEventList(Service, std::move(Events)));
+	LibISDB::MemoryStream Serialized;
+	REQUIRE(LibISDB::EPGDataSerializer::SerializeService(
+		Source, Service.NetworkID, Service.TransportStreamID, Service.ServiceID, Serialized));
+	auto Data = Serialized.DetachBuffer();
+	bool Valid = false;
+
+	SECTION("Declared count is lower than actual") {
+		Data[20] = 0;
+	}
+	SECTION("Declared count is higher than actual") {
+		Data[20] = 2;
+	}
+	SECTION("Early end cannot clear existing events") {
+		Data.resize(32);
+		Data.insert(Data.end(), {1, 0, 0, 0, 0});
+	}
+	SECTION("End chunk cannot declare a missing body") {
+		Data[Data.size() - 4] = 1;
+	}
+	SECTION("An empty service can intentionally clear events") {
+		Data.resize(32);
+		Data[20] = 0;
+		Data.insert(Data.end(), {1, 0, 0, 0, 0});
+		Valid = true;
+	}
+	SECTION("Unknown chunks remain forward compatible") {
+		Data.insert(Data.begin() + 32, {0xFF, 2, 0, 0, 0, 0x12, 0x34});
+		Valid = true;
+	}
+
+	LibISDB::MemoryStream Input(std::move(Data));
+	CHECK(LibISDB::EPGDataSerializer::DeserializeService(Input, Target) == Valid);
+	LibISDB::EPGDatabase::EventList Result;
+	REQUIRE(Target.GetEventListSortedByTime(
+		Service.NetworkID, Service.TransportStreamID, Service.ServiceID, &Result));
+	if (!Valid) {
+		REQUIRE(Result.size() == 1);
+		CHECK(Result[0].EventID == 0x2000);
+		CHECK(Result[0].UpdatedTime == 2000);
+	} else if (Input.GetSize() == 37) {
+		CHECK(Result.empty());
+	} else {
+		REQUIRE(Result.size() == 1);
+		CHECK(Result[0].EventID == 0x1000);
+	}
+}
+
+
 #if defined(LIBISDB_WINDOWS) && defined(LIBISDB_HAS_FFMPEG_AAC)
 
 #include "../LibISDB/Windows/Viewer/DirectShow/AudioDecoders/AACDecoder_LATM.hpp"
