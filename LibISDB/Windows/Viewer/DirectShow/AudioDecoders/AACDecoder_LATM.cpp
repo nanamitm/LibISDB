@@ -235,15 +235,15 @@ bool AACDecoder_LATM::Decode(const uint8_t *pData, size_t *pDataSize, ReturnArg<
 		return false;
 
 	const size_t InputSize = *pDataSize;
+	*pDataSize = 0;
+	size_t Pos = 0;
 
-	m_LOASBuffer.insert(m_LOASBuffer.end(), pData, pData + InputSize);
+	// Consume only through one frame so the caller can decode the rest of
+	// this input immediately. Keep only an incomplete frame between calls.
+	while (Pos < InputSize) {
+		if (m_LOASBuffer.size() < LOAS_HEADER_SIZE)
+			m_LOASBuffer.push_back(pData[Pos++]);
 
-	// PES ペイロード境界と LOAS フレーム境界は一致しないことがあるため、渡された
-	// 分は (内部バッファへ取り込んだ時点で) 常に消費済みとして扱う。複数フレーム分
-	// が一度に届いた場合、残りは次回以降の呼び出しで順次デコードされる。
-	*pDataSize = InputSize;
-
-	for (;;) {
 		const size_t Sync = FindLOASSync();
 		if (Sync == std::numeric_limits<size_t>::max()) {
 			if (m_LOASBuffer.size() > 1) {
@@ -251,14 +251,14 @@ bool AACDecoder_LATM::Decode(const uint8_t *pData, size_t *pDataSize, ReturnArg<
 				m_LOASBuffer.clear();
 				m_LOASBuffer.push_back(Last);
 			}
-			return false;
+			continue;
 		}
 
 		if (Sync > 0)
 			m_LOASBuffer.erase(m_LOASBuffer.begin(), m_LOASBuffer.begin() + Sync);
 
 		if (m_LOASBuffer.size() < LOAS_HEADER_SIZE)
-			return false;
+			continue;
 
 		const size_t PayloadSize =
 			(static_cast<size_t>(m_LOASBuffer[1] & 0x1F) << 8) | m_LOASBuffer[2];
@@ -270,14 +270,23 @@ bool AACDecoder_LATM::Decode(const uint8_t *pData, size_t *pDataSize, ReturnArg<
 		}
 
 		const size_t FrameSize = PayloadSize + LOAS_HEADER_SIZE;
+		const size_t CopySize = std::min(FrameSize - m_LOASBuffer.size(), InputSize - Pos);
+		m_LOASBuffer.insert(m_LOASBuffer.end(), pData + Pos, pData + Pos + CopySize);
+		Pos += CopySize;
 		if (m_LOASBuffer.size() < FrameSize)
-			return false;
+			break;
 
+		// FFmpeg bitstream readers require zero padding after the packet.
+		m_LOASBuffer.resize(FrameSize + AV_INPUT_BUFFER_PADDING_SIZE, 0);
 		const bool OK = DecodePacket(m_LOASBuffer.data(), FrameSize, Info);
-		m_LOASBuffer.erase(m_LOASBuffer.begin(), m_LOASBuffer.begin() + FrameSize);
+		m_LOASBuffer.clear();
+		*pDataSize = Pos;
 
 		return OK;
 	}
+
+	*pDataSize = Pos;
+	return false;
 }
 
 

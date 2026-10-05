@@ -741,6 +741,90 @@ TEST_CASE("EPGDataSerializer", "[epg][serialize]")
 
 
 
+#if defined(LIBISDB_WINDOWS) && defined(LIBISDB_HAS_FFMPEG_AAC)
+
+#include "../LibISDB/Windows/Viewer/DirectShow/AudioDecoders/AACDecoder_LATM.hpp"
+
+namespace
+{
+
+std::vector<std::uint8_t> MakeSilentLOASFrame(unsigned int FrequencyIndex = 3)
+{
+	std::vector<std::uint8_t> Body;
+	unsigned int BitPos = 0;
+	const auto Bits = [&](unsigned int Value, unsigned int Count) {
+		for (unsigned int i = Count; i > 0; i--) {
+			if (BitPos % 8 == 0)
+				Body.push_back(0);
+			Body.back() |= ((Value >> (i - 1)) & 1) << (7 - BitPos % 8);
+			BitPos++;
+		}
+	};
+	Bits(0, 1); // useSameStreamMux
+	Bits(0, 1); // audioMuxVersion
+	Bits(1, 1); // allStreamsSameTimeFraming
+	Bits(0, 6); // numSubFrames
+	Bits(0, 4); // numProgram
+	Bits(0, 3); // numLayer
+	Bits(2, 5); // AAC LC
+	Bits(FrequencyIndex, 4);
+	Bits(2, 4); // stereo
+	Bits(0, 3); // GASpecificConfig
+	Bits(0, 3); // frameLengthType
+	Bits(255, 8); // latmBufferFullness
+	Bits(0, 1); // otherDataPresent
+	Bits(0, 1); // crcCheckPresent
+	Bits(6, 8); // payload length
+	// Silent AAC LC channel pair and ID_END.
+	for (const std::uint8_t Byte : {0x21, 0x10, 0x04, 0x60, 0x8C, 0x1C})
+		Bits(Byte, 8);
+	std::vector<std::uint8_t> Frame = {
+		0x56, static_cast<std::uint8_t>(0xE0 | (Body.size() >> 8)),
+		static_cast<std::uint8_t>(Body.size())};
+	Frame.insert(Frame.end(), Body.begin(), Body.end());
+	return Frame;
+}
+
+}
+
+TEST_CASE("LATM frame consumption", "[windows][audio][latm]")
+{
+	LibISDB::DirectShow::AACDecoder_LATM Decoder;
+	REQUIRE(Decoder.Open());
+	const auto Frame = MakeSilentLOASFrame();
+	LibISDB::DirectShow::AudioDecoder::DecodeFrameInfo Info;
+	SECTION("All frames in one input are decoded immediately") {
+		std::vector<std::uint8_t> Input;
+		for (int i = 0; i < 3; i++)
+			Input.insert(Input.end(), Frame.begin(), Frame.end());
+		std::size_t Pos = 0;
+		int Decoded = 0;
+		while (Pos < Input.size()) {
+			std::size_t Size = Input.size() - Pos;
+			REQUIRE(Decoder.Decode(Input.data() + Pos, &Size, &Info));
+			REQUIRE(Size == Frame.size());
+			CHECK(Info.SampleCount == 1024);
+			CHECK(Info.Info.Frequency == 48000);
+			CHECK(Info.Info.ChannelCount == 2);
+			Pos += Size;
+			Decoded++;
+		}
+		CHECK(Decoded == 3);
+	}
+	SECTION("Frame fragments survive input boundaries") {
+		for (std::size_t Pos = 0; Pos < Frame.size(); Pos++) {
+			std::size_t Size = 1;
+			const bool OK = Decoder.Decode(Frame.data() + Pos, &Size, &Info);
+			CHECK(Size == 1);
+			CHECK(OK == (Pos + 1 == Frame.size()));
+		}
+		CHECK(Info.SampleCount == 1024);
+	}
+}
+
+#endif
+
+
 #ifdef LIBISDB_TEST_WMAIN
 
 static char * ConvertArg(const wchar_t *arg)
