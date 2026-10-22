@@ -221,6 +221,7 @@ namespace LibISDB
 
 		bool DisplayFilterProperty(HWND hwndOwner, PropertyFilterType Filter, int Index = 0);
 		bool FilterHasProperty(PropertyFilterType Filter, int Index = 0) const;
+		COMPointer<IBaseFilter> GetPropertyFilter(PropertyFilterType Filter, int Index = 0) const;
 
 		bool SetUseAudioRendererClock(bool Use);
 		bool GetUseAudioRendererClock() const noexcept { return m_UseAudioRendererClock; }
