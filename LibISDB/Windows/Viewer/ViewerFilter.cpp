@@ -1865,6 +1865,32 @@ bool ViewerFilter::FilterHasProperty(PropertyFilterType Filter, int Index) const
 }
 
 
+COMPointer<IBaseFilter> ViewerFilter::GetPropertyFilter(PropertyFilterType Filter, int Index) const
+{
+	if (!FilterHasProperty(Filter, Index))
+		return COMPointer<IBaseFilter>();
+
+	switch (Filter) {
+	case PropertyFilterType::VideoDecoder:
+		return m_VideoDecoderFilter;
+
+	case PropertyFilterType::VideoRenderer:
+		return COMPointer<IBaseFilter>(m_VideoRenderer->GetRendererFilter());
+
+	case PropertyFilterType::MPEG2Demultiplexer:
+		return m_MPEG2DemuxerFilter;
+
+	case PropertyFilterType::AudioFilter:
+		return m_AudioFilterList[Index];
+
+	case PropertyFilterType::AudioRenderer:
+		return m_AudioRenderer;
+	}
+
+	return COMPointer<IBaseFilter>();
+}
+
+
 bool ViewerFilter::SetUseAudioRendererClock(bool Use)
 {
 	m_UseAudioRendererClock = Use;
