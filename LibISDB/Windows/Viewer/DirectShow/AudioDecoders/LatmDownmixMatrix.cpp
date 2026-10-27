@@ -468,6 +468,23 @@ bool ResolvePreset(
 }
 
 
+bool EnumeratePresetNames(
+	const LibISDB::CharType *pFileName, std::vector<LibISDB::String> *pNames)
+{
+	if ((pFileName == nullptr) || (pNames == nullptr))
+		return false;
+
+	LibISDB::String Text;
+	if (!ReadTextFileUtf8(pFileName, &Text))
+		return false;
+
+	for (const auto &[Name, KeyValues] : ParsePresetSections(Text))
+		pNames->push_back(Name);
+
+	return true;
+}
+
+
 }	// namespace LibISDB::DirectShow::LatmDownmix
 
 

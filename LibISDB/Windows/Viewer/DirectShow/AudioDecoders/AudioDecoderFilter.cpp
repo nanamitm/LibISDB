@@ -34,6 +34,7 @@
 #ifdef LIBISDB_HAS_FFMPEG_AAC
 #include "AACDecoder_FFmpeg.hpp"
 #include "AACDecoder_LATM.hpp"
+#include "LatmDownmixMatrix.hpp"
 #endif
 #include "MPEGAudioDecoder.hpp"
 #include "AC3Decoder.hpp"
@@ -644,6 +645,17 @@ bool AudioDecoderFilter::SetLatmDownmixPreset(const CharType *pFileName, const C
 		ApplyLatmDownmixPreset(m_Decoder.get());
 
 	return true;
+}
+
+
+bool AudioDecoderFilter::EnumerateLatmDownmixPresets(
+	const CharType *pFileName, std::vector<String> *pNames)
+{
+#ifdef LIBISDB_HAS_FFMPEG_AAC
+	return LatmDownmix::EnumeratePresetNames(pFileName, pNames);
+#else
+	return false;
+#endif
 }
 
 

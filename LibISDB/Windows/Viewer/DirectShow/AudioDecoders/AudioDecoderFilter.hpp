@@ -152,6 +152,12 @@ namespace LibISDB::DirectShow
 		 ダウンミックス先のチャンネル数から決まる既定の名前を使う。
 		*/
 		bool SetLatmDownmixPreset(const CharType *pFileName, const CharType *pPresetName);
+		/**
+		 ini ファイルに定義されたダウンミックスのプリセット名を列挙する。
+		 プリセットを選ばせる UI のための補助で、デコーダの状態には影響しない。
+		*/
+		static bool EnumerateLatmDownmixPresets(
+			const CharType *pFileName, std::vector<String> *pNames);
 		uint8_t GetCurrentChannelCount() const;
 		uint8_t GetOutputChannelCount() const;
 		bool GetAudioInfo(ReturnArg<AudioInfo> Info) const;
