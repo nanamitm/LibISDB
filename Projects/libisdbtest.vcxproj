@@ -232,7 +232,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\Tests\libisdbtest.cpp" />
+    <ClCompile Include="..\Tests\libisdbtest.cpp">
+      <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
     <Link>

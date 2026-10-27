@@ -242,6 +242,7 @@
     </ClInclude>
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_FFmpeg.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_LATM.hpp" />
+    <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\LatmDownmixMatrix.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\LibISDB\Windows\Base\BonDriver.cpp">
@@ -372,5 +373,6 @@
     </ClCompile>
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_FFmpeg.cpp" />
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_LATM.cpp" />
+    <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\LatmDownmixMatrix.cpp" />
   </ItemGroup>
 </Project>
