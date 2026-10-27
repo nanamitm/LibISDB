@@ -961,7 +961,8 @@ TEST_CASE("LATM input format changes", "[windows][audio][latm]")
 			CHECK(Size == Frame.size());
 			CHECK(Info.SampleCount == 1024);
 			CHECK(Info.Info.Frequency == (FrequencyIndex == 3 ? 48000 : 44100));
-			CHECK(Info.Info.ChannelCount == 2);
+			// デコーダはダウンミックスせず、入力のチャンネル数のまま返す
+			CHECK(Info.Info.ChannelCount == Channels);
 			CHECK(Info.Info.OriginalChannelCount == Channels);
 		}
 	}

@@ -100,7 +100,7 @@ bool AACDecoder_LATM::Open()
 	ClearAudioInfo();
 	m_LOASBuffer.clear();
 
-	constexpr size_t PCM_BUFFER_SIZE = 2 * sizeof(int16_t) * 4096;
+	constexpr size_t PCM_BUFFER_SIZE = 24 * sizeof(int16_t) * 4096;
 	if (m_PCMBuffer.AllocateBuffer(PCM_BUFFER_SIZE) < PCM_BUFFER_SIZE) {
 		Close();
 		return false;
@@ -138,9 +138,9 @@ bool AACDecoder_LATM::Reset()
 
 bool AACDecoder_LATM::GetChannelMap(int Channels, int *pMap) const
 {
-	// 元のチャンネル数 (22.2ch であれば 24ch) に関わらず、常にステレオへ
-	// ダウンミックスしてから返すため、ここで考慮する必要があるのは
-	// 2ch のマッピングだけで良い。
+	// 2ch は下流のチャンネルマップで使用する。22.2ch (24ch) は放送由来の
+	// インターリーブ順をそのまま返すため、チャンネルマップによる並べ替えは
+	// 行わない。
 	if (Channels != 2)
 		return false;
 
@@ -322,7 +322,10 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 			|| (m_pSwrInputFormat->format != m_pFrame->format)
 			|| (::av_channel_layout_compare(&m_pSwrInputFormat->ch_layout, &m_pFrame->ch_layout) != 0)) {
 		::swr_free(&m_pSwrContext);
-		AVChannelLayout OutLayout = AV_CHANNEL_LAYOUT_STEREO;
+		// 出力のチャンネル順序はデコーダから渡された順序を保持する
+		AVChannelLayout OutLayout{};
+		if (::av_channel_layout_copy(&OutLayout, &m_pFrame->ch_layout) < 0)
+			return false;
 
 		SwrContext *pSwr = nullptr;
 		Ret = ::swr_alloc_set_opts2(
@@ -347,9 +350,9 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 		m_pSwrContext = pSwr;
 	}
 
-	constexpr int OUT_CHANNELS = 2;
+	const int OutChannels = SrcChannels;
 	const size_t RequiredSize =
-		static_cast<size_t>(OUT_CHANNELS) * sizeof(int16_t) * static_cast<size_t>(m_pFrame->nb_samples);
+		static_cast<size_t>(OutChannels) * sizeof(int16_t) * static_cast<size_t>(m_pFrame->nb_samples);
 	if (m_PCMBuffer.GetBufferSize() < RequiredSize) {
 		if (m_PCMBuffer.AllocateBuffer(RequiredSize) < RequiredSize)
 			return false;
@@ -364,7 +367,7 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 		return false;
 
 	m_AudioInfo.Frequency = SampleRate;
-	m_AudioInfo.ChannelCount = OUT_CHANNELS;
+	m_AudioInfo.ChannelCount = OutChannels;
 	m_AudioInfo.OriginalChannelCount = SrcChannels;
 	m_AudioInfo.DualMono = false;
 

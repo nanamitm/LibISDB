@@ -61,6 +61,7 @@ namespace LibISDB::DirectShow
 
 	// AudioDecoderFilter
 		static constexpr BYTE ChannelCount_DualMono = 0x00;
+		static constexpr BYTE ChannelCount_22Point2 = 24;
 		static constexpr BYTE ChannelCount_Invalid  = 0xFF;
 
 		enum class DecoderType {
