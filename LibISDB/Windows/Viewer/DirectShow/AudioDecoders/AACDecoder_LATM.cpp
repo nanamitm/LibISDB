@@ -31,7 +31,9 @@
 
 
 #include "AACDecoder_LATM.hpp"
+#include "LatmDownmixMatrix.hpp"
 #include "../../../../Base/DebugDef.hpp"
+#include <vector>
 #include <cstdio>
 #include <limits>
 
@@ -140,14 +142,28 @@ bool AACDecoder_LATM::Reset()
 
 bool AACDecoder_LATM::GetChannelMap(int Channels, int *pMap) const
 {
-	// 2ch は下流のチャンネルマップで使用する。22.2ch (24ch) は放送由来の
-	// インターリーブ順をそのまま返すため、チャンネルマップによる並べ替えは
-	// 行わない。
-	if (Channels != 2)
-		return false;
+	// ダウンミックスした場合の並びは LatmDownmix の出力スロットの順序で、
+	// 下流のチャンネルマップと同じ並びになっているため並べ替えは不要。
+	// 22.2ch (24ch) をそのまま出す場合も、放送由来の順序を保つために
+	// 並べ替えは行わない。
+	switch (Channels) {
+	case 2:
+		pMap[CHANNEL_2_L] = 0;
+		pMap[CHANNEL_2_R] = 1;
+		break;
 
-	pMap[CHANNEL_2_L] = 0;
-	pMap[CHANNEL_2_R] = 1;
+	case 6:
+		pMap[CHANNEL_6_FL]  = 0;
+		pMap[CHANNEL_6_FR]  = 1;
+		pMap[CHANNEL_6_FC]  = 2;
+		pMap[CHANNEL_6_LFE] = 3;
+		pMap[CHANNEL_6_BL]  = 4;
+		pMap[CHANNEL_6_BR]  = 5;
+		break;
+
+	default:
+		return false;
+	}
 
 	return true;
 }
@@ -155,13 +171,96 @@ bool AACDecoder_LATM::GetChannelMap(int Channels, int *pMap) const
 
 bool AACDecoder_LATM::SetDownmixChannels(int Channels)
 {
-	// 現状はステレオへのダウンミックスのみ対応する
-	if ((Channels != 0) && (Channels != 2))
+	if ((Channels != 0) && (Channels != 2) && (Channels != 6) && (Channels != 8))
 		return false;
 
-	m_DownmixChannels = Channels;
+	if (m_DownmixChannels != Channels) {
+		m_DownmixChannels = Channels;
+		ResolveMatrix();
+	}
 
 	return true;
+}
+
+
+bool AACDecoder_LATM::SetDownmixPreset(const CharType *pFileName, const CharType *pPresetName)
+{
+	m_PresetFileName = (pFileName != nullptr) ? pFileName : LIBISDB_STR("");
+	m_PresetName = (pPresetName != nullptr) ? pPresetName : LIBISDB_STR("");
+
+	ResolveMatrix();
+
+	return true;
+}
+
+
+void AACDecoder_LATM::ResolveMatrix()
+{
+	m_Matrix.reset();
+
+	if (m_DownmixChannels == 0)
+		return;
+
+	// プリセット名の指定が無い場合、ダウンミックス先のチャンネル数から決める
+	const CharType *pDefaultName =
+		(m_DownmixChannels == 8) ? LIBISDB_STR("7.1ch") :
+		(m_DownmixChannels == 6) ? LIBISDB_STR("5.1ch") : LIBISDB_STR("2ch");
+	const CharType *pPresetName =
+		!m_PresetName.empty() ? m_PresetName.c_str() : pDefaultName;
+
+	LatmDownmix::Matrix Matrix;
+	bool Resolved = LatmDownmix::ResolvePreset(
+		!m_PresetFileName.empty() ? m_PresetFileName.c_str() : nullptr,
+		pPresetName, &Matrix);
+
+	// プリセットの出力チャンネル数が要求と食い違う場合は、要求に合う
+	// 組み込み定義へ戻す
+	if (Resolved && (Matrix.OutputChannels.size() != static_cast<size_t>(m_DownmixChannels))) {
+		LIBISDB_TRACE(
+			LIBISDB_STR("AACDecoder_LATM: プリセット '{}' は {} ch 用ではありません\n"),
+			pPresetName, m_DownmixChannels);
+		Resolved = (pPresetName != pDefaultName)
+			&& LatmDownmix::GetBuiltinPreset(pDefaultName, &Matrix)
+			&& (Matrix.OutputChannels.size() == static_cast<size_t>(m_DownmixChannels));
+	}
+
+	if (!Resolved) {
+		// マトリクスが無い場合は libswresample の既定のダウンミックスに任せる
+		LIBISDB_TRACE(
+			LIBISDB_STR("AACDecoder_LATM: ダウンミックスのマトリクスを解決できません\n"));
+		return;
+	}
+
+	m_Matrix = std::make_unique<LatmDownmix::Matrix>(std::move(Matrix));
+}
+
+
+bool AACDecoder_LATM::SetSwrMatrix(SwrContext *pSwr) const
+{
+	if (!m_Matrix)
+		return false;
+
+	const int InChannels = m_pFrame->ch_layout.nb_channels;
+	const size_t OutChannels = m_Matrix->OutputChannels.size();
+	if ((InChannels <= 0) || (OutChannels == 0))
+		return false;
+
+	// 出力ch×入力chの係数行列を組み立てる。入力に存在しないチャンネルの
+	// 指定は無視する (5.1ch の素材に 22.2ch 用のプリセットを使った場合など)
+	std::vector<double> Coefficients(OutChannels * static_cast<size_t>(InChannels), 0.0);
+
+	for (size_t i = 0; i < OutChannels; i++) {
+		for (const LatmDownmix::Route &Route : m_Matrix->OutputChannels[i].Routes) {
+			const int Index = ::av_channel_layout_index_from_channel(
+				&m_pFrame->ch_layout, Route.InputChannel);
+			if (Index >= 0) {
+				Coefficients[i * static_cast<size_t>(InChannels) + static_cast<size_t>(Index)] +=
+					static_cast<double>(Route.Gain) * static_cast<double>(m_Matrix->OutputGain);
+			}
+		}
+	}
+
+	return ::swr_set_matrix(pSwr, Coefficients.data(), InChannels) >= 0;
 }
 
 
@@ -339,13 +438,31 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 		::swr_free(&m_pSwrContext);
 
 		// ダウンミックスしない場合、出力のチャンネル順序はデコーダから
-		// 渡された順序をそのまま保持する
+		// 渡された順序をそのまま保持する。ダウンミックスする場合の並びは
+		// LatmDownmix のマトリクスの出力スロットと同じ順序になる
 		AVChannelLayout OutLayout{};
-		if (m_DownmixChannels == 2) {
-			const AVChannelLayout StereoLayout = AV_CHANNEL_LAYOUT_STEREO;
-			Ret = ::av_channel_layout_copy(&OutLayout, &StereoLayout);
-		} else {
+		switch (m_DownmixChannels) {
+		case 2:
+			{
+				const AVChannelLayout Layout = AV_CHANNEL_LAYOUT_STEREO;
+				Ret = ::av_channel_layout_copy(&OutLayout, &Layout);
+			}
+			break;
+		case 6:
+			{
+				const AVChannelLayout Layout = AV_CHANNEL_LAYOUT_5POINT1_BACK;
+				Ret = ::av_channel_layout_copy(&OutLayout, &Layout);
+			}
+			break;
+		case 8:
+			{
+				const AVChannelLayout Layout = AV_CHANNEL_LAYOUT_7POINT1;
+				Ret = ::av_channel_layout_copy(&OutLayout, &Layout);
+			}
+			break;
+		default:
 			Ret = ::av_channel_layout_copy(&OutLayout, &m_pFrame->ch_layout);
+			break;
 		}
 		if (Ret < 0)
 			return false;
@@ -356,6 +473,11 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 			&OutLayout, AV_SAMPLE_FMT_S16, SampleRate,
 			&m_pFrame->ch_layout, static_cast<AVSampleFormat>(m_pFrame->format), SampleRate,
 			0, nullptr);
+
+		// 係数行列は swr_init() より前に設定する必要がある。マトリクスが
+		// 無い場合は libswresample の既定のダウンミックスがそのまま使われる
+		if ((Ret >= 0) && (pSwr != nullptr) && (m_DownmixChannels != 0))
+			SetSwrMatrix(pSwr);
 
 		if ((Ret < 0) || (pSwr == nullptr) || (::swr_init(pSwr) < 0)) {
 			if (pSwr != nullptr)
