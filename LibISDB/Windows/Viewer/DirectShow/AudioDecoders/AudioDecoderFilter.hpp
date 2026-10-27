@@ -61,6 +61,7 @@ namespace LibISDB::DirectShow
 
 	// AudioDecoderFilter
 		static constexpr BYTE ChannelCount_DualMono = 0x00;
+		static constexpr BYTE ChannelCount_7Point1  = 8;
 		static constexpr BYTE ChannelCount_22Point2 = 24;
 		static constexpr BYTE ChannelCount_Invalid  = 0xFF;
 
@@ -139,6 +140,7 @@ namespace LibISDB::DirectShow
 		DecoderType GetDecoderType() const noexcept { return m_DecoderType; }
 		/**
 		 22.2ch 等の多チャンネル音声をデコーダにダウンミックスさせる。
+		 指定できるのは 2 / 6 (5.1ch) / 8 (7.1ch)。
 		 0 を指定するとダウンミックスせず、そのチャンネル数のまま出力する
 		 (24ch を解釈できる出力先が繋がっている場合にのみ使用する)。
 		*/
