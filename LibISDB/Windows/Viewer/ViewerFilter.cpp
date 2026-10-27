@@ -624,8 +624,17 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 
 			// 24ch をそのまま出せるのは、それを解釈する出力先 (Null レンダラ
 			// 経由のサンプルコールバック) が繋がっている場合だけなので、
-			// 通常の音声レンダラへ出す場合はステレオへ落とさせる
-			m_AudioDecoder->SetLatmDownmixChannels(Settings.UseNullAudioRenderer ? 0 : 2);
+			// 通常の音声レンダラへ出す場合は指定されたチャンネル数へ落とさせる
+			m_AudioDecoder->SetLatmDownmixPreset(
+				Settings.LatmDownmixPresetFileName.c_str(),
+				Settings.LatmDownmixPresetName.c_str());
+			if (!m_AudioDecoder->SetLatmDownmixChannels(
+					Settings.UseNullAudioRenderer ? 0 : Settings.LatmDownmixChannels)) {
+				Log(Logger::LogType::Warning,
+					LIBISDB_STR("音声のダウンミックス先 {} ch は指定できません。"),
+					Settings.LatmDownmixChannels);
+				m_AudioDecoder->SetLatmDownmixChannels(Settings.UseNullAudioRenderer ? 0 : 2);
+			}
 
 			m_AudioDecoder->AddEventListener(this);
 			m_AudioDecoder->SetJitterCorrection(m_AdjustAudioStreamTime);

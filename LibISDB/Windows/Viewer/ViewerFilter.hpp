@@ -78,6 +78,14 @@ namespace LibISDB
 			/** 音声デコーダの出力を Null レンダラへ接続し、音声は
 			    SetAudioSampleCallback() のコールバックで受け取る */
 			bool UseNullAudioRenderer = false;
+			/** 22.2ch 音声のダウンミックス先チャンネル数 (2 / 6 / 8)。
+			    UseNullAudioRenderer の場合はダウンミックスせず 24ch のまま出力する */
+			int LatmDownmixChannels = 2;
+			/** ダウンミックスのプリセットを定義した ini ファイルのパス。
+			    空なら組み込みのプリセットのみを使う */
+			String LatmDownmixPresetFileName;
+			/** 使用するプリセット名。空ならチャンネル数から決まる既定名を使う */
+			String LatmDownmixPresetName;
 			std::vector<String> AudioFilterList;
 		};
 

@@ -101,6 +101,20 @@ namespace LibISDB::DirectShow
 		*/
 		virtual bool SetDownmixChannels(int Channels) { return false; }
 
+		/**
+		 @brief  ダウンミックスに使うプリセットを指定する
+
+		 @param[in] pFileName   プリセットを定義した ini ファイルのパス。
+		                        nullptr なら組み込みの定義のみを使う
+		 @param[in] pPresetName 使用するプリセット名。nullptr ならダウンミックス先の
+		                        チャンネル数から決まる既定の名前を使う
+
+		 @return 対応しているデコーダで設定できた場合 true
+		*/
+		virtual bool SetDownmixPreset(const CharType *pFileName, const CharType *pPresetName) {
+			return false;
+		}
+
 		bool GetAudioInfo(ReturnArg<AudioInfo> Info) const;
 
 	protected:

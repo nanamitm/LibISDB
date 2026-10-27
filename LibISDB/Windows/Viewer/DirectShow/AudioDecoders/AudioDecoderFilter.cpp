@@ -633,6 +633,28 @@ bool AudioDecoderFilter::SetLatmDownmixChannels(int Channels)
 }
 
 
+bool AudioDecoderFilter::SetLatmDownmixPreset(const CharType *pFileName, const CharType *pPresetName)
+{
+	CAutoLock AutoLock(&m_cPropLock);
+
+	m_LatmDownmixPresetFileName = (pFileName != nullptr) ? pFileName : LIBISDB_STR("");
+	m_LatmDownmixPresetName = (pPresetName != nullptr) ? pPresetName : LIBISDB_STR("");
+
+	if (m_Decoder)
+		ApplyLatmDownmixPreset(m_Decoder.get());
+
+	return true;
+}
+
+
+void AudioDecoderFilter::ApplyLatmDownmixPreset(AudioDecoder *pDecoder) const
+{
+	pDecoder->SetDownmixPreset(
+		!m_LatmDownmixPresetFileName.empty() ? m_LatmDownmixPresetFileName.c_str() : nullptr,
+		!m_LatmDownmixPresetName.empty() ? m_LatmDownmixPresetName.c_str() : nullptr);
+}
+
+
 uint8_t AudioDecoderFilter::GetCurrentChannelCount() const
 {
 	CAutoLock AutoLock(&m_cPropLock);
@@ -1528,8 +1550,10 @@ AudioDecoder * AudioDecoderFilter::CreateDecoder(DecoderType Type)
 	}
 
 	// デコーダを作り直した場合も設定が引き継がれるようにする
-	if (pDecoder != nullptr)
+	if (pDecoder != nullptr) {
+		ApplyLatmDownmixPreset(pDecoder);
 		pDecoder->SetDownmixChannels(m_LatmDownmixChannels);
+	}
 
 	return pDecoder;
 }

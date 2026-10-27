@@ -146,6 +146,12 @@ namespace LibISDB::DirectShow
 		*/
 		bool SetLatmDownmixChannels(int Channels);
 		int GetLatmDownmixChannels() const noexcept { return m_LatmDownmixChannels; }
+		/**
+		 ダウンミックスに使うプリセットを指定する。
+		 ファイル名が空なら組み込みの定義のみを、プリセット名が空なら
+		 ダウンミックス先のチャンネル数から決まる既定の名前を使う。
+		*/
+		bool SetLatmDownmixPreset(const CharType *pFileName, const CharType *pPresetName);
 		uint8_t GetCurrentChannelCount() const;
 		uint8_t GetOutputChannelCount() const;
 		bool GetAudioInfo(ReturnArg<AudioInfo> Info) const;
@@ -209,10 +215,13 @@ namespace LibISDB::DirectShow
 		void GainControl(int16_t *pBuffer, size_t Samples, float Gain);
 		void SelectDualMonoStereoMode();
 		AudioDecoder * CreateDecoder(DecoderType Type);
+		void ApplyLatmDownmixPreset(AudioDecoder *pDecoder) const;
 
 		DecoderType m_DecoderType;
 		/** LATM 音声のダウンミックス先。既定では通常の音声レンダラへ出せるステレオ */
 		int m_LatmDownmixChannels = 2;
+		String m_LatmDownmixPresetFileName;
+		String m_LatmDownmixPresetName;
 		std::unique_ptr<AudioDecoder> m_Decoder;
 		mutable CCritSec m_cPropLock;
 		CMediaType m_MediaType;
