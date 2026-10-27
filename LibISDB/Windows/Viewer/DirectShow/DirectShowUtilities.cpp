@@ -526,7 +526,8 @@ bool HasPropertyPage(IBaseFilter *pFilter)
  @param[in]     pGraphBuilder フィルタグラフの IGraphBuilder
  @param[in]     pFilter       接続するフィルタ
  @param[in]     pszFilterName フィルタ名(nullptr でも可)
- @param[in,out] pOutputPin    接続するピン。正常終了なら解放され、換わりにフィルタの出力ピンが返される
+ @param[in,out] pOutputPin    接続するピン。正常終了なら解放され、換わりにフィルタの出力ピンが返される。
+                             ただし出力ピンを持たない終端フィルタの場合は元のピンがそのまま残る
  @param[in]     Direct        直接接続に限定する場合は true
 
  @return 結果
@@ -539,7 +540,8 @@ HRESULT AppendFilterAndConnect(
 	HRESULT hr;
 
 	// ポインタチェック
-	if ((pGraphBuilder == nullptr) || (pFilter == nullptr) || (pOutputPin == nullptr))
+	if ((pGraphBuilder == nullptr) || (pFilter == nullptr) || (pOutputPin == nullptr)
+			|| (pOutputPin->Get() == nullptr))
 		return E_POINTER;
 
 	hr = pGraphBuilder->AddFilter(pFilter, (pszFilterName != nullptr) ? pszFilterName : L"No Name");
@@ -568,7 +570,10 @@ HRESULT AppendFilterAndConnect(
 	}
 
 	// 出力ピンを返す
-	pOutputPin->Attach(GetFilterPin(pFilter, PINDIR_OUTPUT));
+	// レンダラ等の終端フィルタは出力ピンを持たないため、その場合は
+	// 渡されたピンを解放せずそのまま残す
+	if (IPin *pNextOutputPin = GetFilterPin(pFilter, PINDIR_OUTPUT))
+		pOutputPin->Attach(pNextOutputPin);
 
 	return S_OK;
 }
@@ -581,7 +586,8 @@ HRESULT AppendFilterAndConnect(
  @param[in]     clsidFilter     接続するフィルタの CLSID
  @param[in]     pszFilterName   フィルタ名(nullptr でも可)
  @param[out]    pAppendedFilter 接続されたフィルタを返す変数へのポインタ。不要な場合は nullptr
- @param[in,out] pOutputPin      接続するピン。正常終了なら解放され、換わりにフィルタの出力ピンが返される
+ @param[in,out] pOutputPin      接続するピン。正常終了なら解放され、換わりにフィルタの出力ピンが返される。
+                               ただし出力ピンを持たない終端フィルタの場合は元のピンがそのまま残る
  @param[in]     Direct          直接接続に限定する場合は true
 
  @return 結果
