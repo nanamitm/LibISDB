@@ -75,6 +75,9 @@ namespace LibISDB
 			uint8_t VideoStreamType = STREAM_TYPE_INVALID;
 			LPCWSTR pszVideoDecoder = nullptr;
 			DirectShow::FilterInfo AudioDevice;
+			/** 音声デコーダの出力を Null レンダラへ接続し、音声は
+			    SetAudioSampleCallback() のコールバックで受け取る */
+			bool UseNullAudioRenderer = false;
 			std::vector<String> AudioFilterList;
 		};
 

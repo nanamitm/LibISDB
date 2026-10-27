@@ -733,33 +733,37 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 		{
 			bool OK = false;
 
-			if (!Settings.AudioDevice.MonikerName.empty()) {
-				hr = DirectShow::CreateFilterFromMonikerName(
-					Settings.AudioDevice.MonikerName.c_str(), &m_AudioRenderer, &m_AudioRendererName);
-				if (SUCCEEDED(hr)) {
-					OK = true;
+			// Null レンダラが指定された場合は音声デバイスを選択せず、
+			// 下の Null レンダラ接続へ流す
+			if (!Settings.UseNullAudioRenderer) {
+				if (!Settings.AudioDevice.MonikerName.empty()) {
+					hr = DirectShow::CreateFilterFromMonikerName(
+						Settings.AudioDevice.MonikerName.c_str(), &m_AudioRenderer, &m_AudioRendererName);
+					if (SUCCEEDED(hr)) {
+						OK = true;
+					}
 				}
-			}
 
-			if (!OK && !Settings.AudioDevice.FriendlyName.empty()) {
-				DirectShow::DeviceEnumerator DevEnum;
+				if (!OK && !Settings.AudioDevice.FriendlyName.empty()) {
+					DirectShow::DeviceEnumerator DevEnum;
 
-				if (DevEnum.CreateFilter(
-						CLSID_AudioRendererCategory,
-						Settings.AudioDevice.FriendlyName.c_str(),
-						m_AudioRenderer.GetPP())) {
-					m_AudioRendererName = Settings.AudioDevice.FriendlyName;
-					OK = true;
+					if (DevEnum.CreateFilter(
+							CLSID_AudioRendererCategory,
+							Settings.AudioDevice.FriendlyName.c_str(),
+							m_AudioRenderer.GetPP())) {
+						m_AudioRendererName = Settings.AudioDevice.FriendlyName;
+						OK = true;
+					}
 				}
-			}
 
-			if (!OK) {
-				hr = ::CoCreateInstance(
-					CLSID_DSoundRender, nullptr, CLSCTX_INPROC_SERVER,
-					IID_PPV_ARGS(m_AudioRenderer.GetPP()));
-				if (SUCCEEDED(hr)) {
-					m_AudioRendererName = LIBISDB_STR("DirectSound Renderer");
-					OK = true;
+				if (!OK) {
+					hr = ::CoCreateInstance(
+						CLSID_DSoundRender, nullptr, CLSCTX_INPROC_SERVER,
+						IID_PPV_ARGS(m_AudioRenderer.GetPP()));
+					if (SUCCEEDED(hr)) {
+						m_AudioRendererName = LIBISDB_STR("DirectSound Renderer");
+						OK = true;
+					}
 				}
 			}
 
@@ -798,7 +802,7 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 					}
 				}
 			} else {
-				// 音声デバイスが無い?
+				// Nullレンダラが指定された、または音声デバイスが無い?
 				// Nullレンダラを繋げておく
 				hr = ::CoCreateInstance(
 					CLSID_NullRenderer, nullptr, CLSCTX_INPROC_SERVER,
