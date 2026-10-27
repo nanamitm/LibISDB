@@ -173,6 +173,13 @@ namespace LibISDB::DirectShow::LatmDownmix
 		const LibISDB::CharType *pPresetName,
 		Matrix *pMatrix);
 
+	/**
+	 iniファイル中に定義されたプリセットの名前を列挙する。
+	 ファイルが開けない場合は何も追加せずfalseを返す。
+	*/
+	bool EnumeratePresetNames(
+		const LibISDB::CharType *pFileName, std::vector<LibISDB::String> *pNames);
+
 }	// namespace LibISDB::DirectShow::LatmDownmix
 
 
