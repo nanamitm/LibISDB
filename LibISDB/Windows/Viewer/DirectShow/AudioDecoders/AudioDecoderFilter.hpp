@@ -137,6 +137,13 @@ namespace LibISDB::DirectShow
 
 		bool SetDecoderType(DecoderType Type);
 		DecoderType GetDecoderType() const noexcept { return m_DecoderType; }
+		/**
+		 22.2ch 等の多チャンネル音声をデコーダにダウンミックスさせる。
+		 0 を指定するとダウンミックスせず、そのチャンネル数のまま出力する
+		 (24ch を解釈できる出力先が繋がっている場合にのみ使用する)。
+		*/
+		bool SetLatmDownmixChannels(int Channels);
+		int GetLatmDownmixChannels() const noexcept { return m_LatmDownmixChannels; }
 		uint8_t GetCurrentChannelCount() const;
 		uint8_t GetOutputChannelCount() const;
 		bool GetAudioInfo(ReturnArg<AudioInfo> Info) const;
@@ -202,6 +209,8 @@ namespace LibISDB::DirectShow
 		AudioDecoder * CreateDecoder(DecoderType Type);
 
 		DecoderType m_DecoderType;
+		/** LATM 音声のダウンミックス先。既定では通常の音声レンダラへ出せるステレオ */
+		int m_LatmDownmixChannels = 2;
 		std::unique_ptr<AudioDecoder> m_Decoder;
 		mutable CCritSec m_cPropLock;
 		CMediaType m_MediaType;

@@ -616,6 +616,22 @@ bool AudioDecoderFilter::SetDecoderType(DecoderType Type)
 }
 
 
+bool AudioDecoderFilter::SetLatmDownmixChannels(int Channels)
+{
+	CAutoLock AutoLock(&m_cPropLock);
+
+	if ((Channels != 0) && (Channels != 2))
+		return false;
+
+	m_LatmDownmixChannels = Channels;
+
+	if (m_Decoder)
+		m_Decoder->SetDownmixChannels(Channels);
+
+	return true;
+}
+
+
 uint8_t AudioDecoderFilter::GetCurrentChannelCount() const
 {
 	CAutoLock AutoLock(&m_cPropLock);
@@ -1461,32 +1477,44 @@ void AudioDecoderFilter::SelectDualMonoStereoMode()
 
 AudioDecoder * AudioDecoderFilter::CreateDecoder(DecoderType Type)
 {
+	AudioDecoder *pDecoder = nullptr;
+
 	switch (Type) {
 	case DecoderType::AAC:
-		return new AACDecoder_FAAD2;
+		pDecoder = new AACDecoder_FAAD2;
+		break;
 
 	case DecoderType::MPEGAudio:
-		return new MPEGAudioDecoder;
+		pDecoder = new MPEGAudioDecoder;
+		break;
 
 	case DecoderType::AC3:
-		return new AC3Decoder;
+		pDecoder = new AC3Decoder;
+		break;
 
 #ifdef LIBISDB_HAS_FDK_AAC
 	case DecoderType::FDK_AAC:
-		return new AACDecoder_FDK;
+		pDecoder = new AACDecoder_FDK;
+		break;
 #endif
 
 #ifdef LIBISDB_HAS_FFMPEG_AAC
 	case DecoderType::FFmpeg_AAC:
-		return new AACDecoder_FFmpeg;
+		pDecoder = new AACDecoder_FFmpeg;
+		break;
 
 	case DecoderType::LATM_AAC:
-		return new AACDecoder_LATM;
+		pDecoder = new AACDecoder_LATM;
+		break;
 #endif
 
 	}
 
-	return nullptr;
+	// デコーダを作り直した場合も設定が引き継がれるようにする
+	if (pDecoder != nullptr)
+		pDecoder->SetDownmixChannels(m_LatmDownmixChannels);
+
+	return pDecoder;
 }
 
 

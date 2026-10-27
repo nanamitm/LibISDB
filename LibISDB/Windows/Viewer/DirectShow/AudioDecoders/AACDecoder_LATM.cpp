@@ -82,6 +82,8 @@ AACDecoder_LATM::AACDecoder_LATM() noexcept
 	, m_pFrame(nullptr)
 	, m_pSwrInputFormat(nullptr)
 	, m_pSwrContext(nullptr)
+	, m_DownmixChannels(0)
+	, m_SwrDownmixChannels(0)
 {
 }
 
@@ -146,6 +148,18 @@ bool AACDecoder_LATM::GetChannelMap(int Channels, int *pMap) const
 
 	pMap[CHANNEL_2_L] = 0;
 	pMap[CHANNEL_2_R] = 1;
+
+	return true;
+}
+
+
+bool AACDecoder_LATM::SetDownmixChannels(int Channels)
+{
+	// 現状はステレオへのダウンミックスのみ対応する
+	if ((Channels != 0) && (Channels != 2))
+		return false;
+
+	m_DownmixChannels = Channels;
 
 	return true;
 }
@@ -318,13 +332,22 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 		return false;
 
 	if ((m_pSwrContext == nullptr)
+			|| (m_SwrDownmixChannels != m_DownmixChannels)
 			|| (m_pSwrInputFormat->sample_rate != SampleRate)
 			|| (m_pSwrInputFormat->format != m_pFrame->format)
 			|| (::av_channel_layout_compare(&m_pSwrInputFormat->ch_layout, &m_pFrame->ch_layout) != 0)) {
 		::swr_free(&m_pSwrContext);
-		// 出力のチャンネル順序はデコーダから渡された順序を保持する
+
+		// ダウンミックスしない場合、出力のチャンネル順序はデコーダから
+		// 渡された順序をそのまま保持する
 		AVChannelLayout OutLayout{};
-		if (::av_channel_layout_copy(&OutLayout, &m_pFrame->ch_layout) < 0)
+		if (m_DownmixChannels == 2) {
+			const AVChannelLayout StereoLayout = AV_CHANNEL_LAYOUT_STEREO;
+			Ret = ::av_channel_layout_copy(&OutLayout, &StereoLayout);
+		} else {
+			Ret = ::av_channel_layout_copy(&OutLayout, &m_pFrame->ch_layout);
+		}
+		if (Ret < 0)
 			return false;
 
 		SwrContext *pSwr = nullptr;
@@ -348,9 +371,10 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 		m_pSwrInputFormat->sample_rate = SampleRate;
 		m_pSwrInputFormat->format = m_pFrame->format;
 		m_pSwrContext = pSwr;
+		m_SwrDownmixChannels = m_DownmixChannels;
 	}
 
-	const int OutChannels = SrcChannels;
+	const int OutChannels = (m_DownmixChannels != 0) ? m_DownmixChannels : SrcChannels;
 	const size_t RequiredSize =
 		static_cast<size_t>(OutChannels) * sizeof(int16_t) * static_cast<size_t>(m_pFrame->nb_samples);
 	if (m_PCMBuffer.GetBufferSize() < RequiredSize) {

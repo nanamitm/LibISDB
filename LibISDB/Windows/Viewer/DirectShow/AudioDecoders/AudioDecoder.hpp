@@ -90,6 +90,17 @@ namespace LibISDB::DirectShow
 		virtual bool GetChannelMap(int Channels, int *pMap) const { return false; }
 		virtual bool GetDownmixInfo(ReturnArg<DownmixInfo> Info) const { return false; }
 
+		/**
+		 @brief  多チャンネル音声のダウンミックス先チャンネル数を設定する
+
+		 22.2ch のようにそのままでは下流が扱えないチャンネル数の音声を、
+		 デコードの段階でダウンミックスさせるために使う。
+		 0 を指定するとダウンミックスせず、デコードした構成のまま返す。
+
+		 @return 対応しているデコーダで設定できた場合 true
+		*/
+		virtual bool SetDownmixChannels(int Channels) { return false; }
+
 		bool GetAudioInfo(ReturnArg<AudioInfo> Info) const;
 
 	protected:
