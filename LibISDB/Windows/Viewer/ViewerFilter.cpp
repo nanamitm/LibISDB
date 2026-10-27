@@ -622,6 +622,11 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 					HRESULTErrorCode(E_POINTER),
 					LIBISDB_STR("音声デコーダの出力ピンを取得できません。"));
 
+			// 24ch をそのまま出せるのは、それを解釈する出力先 (Null レンダラ
+			// 経由のサンプルコールバック) が繋がっている場合だけなので、
+			// 通常の音声レンダラへ出す場合はステレオへ落とさせる
+			m_AudioDecoder->SetLatmDownmixChannels(Settings.UseNullAudioRenderer ? 0 : 2);
+
 			m_AudioDecoder->AddEventListener(this);
 			m_AudioDecoder->SetJitterCorrection(m_AdjustAudioStreamTime);
 			if (m_pAudioSampleCallback)

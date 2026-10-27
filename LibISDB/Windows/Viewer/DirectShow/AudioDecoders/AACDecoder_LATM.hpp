@@ -48,10 +48,13 @@ namespace LibISDB::DirectShow
 	/**
 	 @brief  LATM/LOAS 伝送された AAC (ISO/IEC 14496-3, stream_type 0x11) 用デコーダ
 
-	 22.2ch 等の多チャンネル音声は LATM フレーミングで伝送されるが、コンシューマ
-	 向けのオーディオ機器・LibISDB のチャンネルマップには 22.2ch という概念がそもそも
-	 存在しない。そのため、デコード結果は元のチャンネル数に関わらず常に
-	 libswresample でステレオへダウンミックスしてから返す。
+	 22.2ch 等の多チャンネル音声は LATM フレーミングで伝送される。デコード結果は
+	 放送由来のチャンネル順序を保ったインターリーブ PCM として返し、チャンネルの
+	 解釈は下流のフィルタに委ねる。
+
+	 ただし 24ch をそのまま扱えるのは、それを解釈できる出力先が繋がっている場合に
+	 限られる。通常の音声レンダラへ出力する場合は、SetDownmixChannels() で
+	 ダウンミックス先のチャンネル数を指定する。
 	*/
 	class AACDecoder_LATM
 		: public AudioDecoder
@@ -69,6 +72,7 @@ namespace LibISDB::DirectShow
 
 		bool GetChannelMap(int Channels, int *pMap) const override;
 		bool GetDownmixInfo(ReturnArg<DownmixInfo> Info) const override;
+		bool SetDownmixChannels(int Channels) override;
 
 	// AACDecoder_LATM
 		static void GetVersion(std::string *pVersion);
@@ -84,6 +88,10 @@ namespace LibISDB::DirectShow
 		AVFrame *m_pFrame;
 		AVFrame *m_pSwrInputFormat;
 		SwrContext *m_pSwrContext;
+		/** ダウンミックス先のチャンネル数。0 ならダウンミックスしない */
+		int m_DownmixChannels;
+		/** m_pSwrContext を構築した時点の m_DownmixChannels */
+		int m_SwrDownmixChannels;
 		std::vector<uint8_t> m_LOASBuffer;
 		DataBuffer m_PCMBuffer;
 	};
