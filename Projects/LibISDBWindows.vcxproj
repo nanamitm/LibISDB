@@ -102,7 +102,9 @@
     </ClCompile>
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AC3Decoder.cpp" />
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AudioDecoder.cpp" />
-    <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AudioDecoderFilter.cpp" />
+    <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AudioDecoderFilter.cpp">
+      <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\BaseClasses\;$(SolutionDir)..\Thirdparty\ffmpeg\include\</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\MPEGAudioDecoder.cpp" />
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\DirectShowFilterGraph.cpp" />
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\DirectShowUtilities.cpp" />
