@@ -1159,6 +1159,17 @@ TEST_CASE("LATM downmix preset file", "[windows][audio][latm][downmix]")
 		CHECK(Matrix.OutputChannels.size() == 6);
 	}
 
+	SECTION("A preset built for another channel count is rejected") {
+		// 2ch構成のプリセットを5.1chとして使おうとした場合
+		const TempPresetFile File(
+			"[Preset:5.1ch]\n"
+			"FL=FL\n"
+			"FR=FR\n");
+		LatmDownmix::Matrix Loaded;
+		REQUIRE(LatmDownmix::LoadPresetFromFile(File.Get(), L"5.1ch", &Loaded));
+		CHECK(Loaded.OutputChannels.size() == 2);
+	}
+
 	SECTION("The file takes precedence over the builtin definition") {
 		const TempPresetFile File(
 			"[Preset:5.1ch]\n"
@@ -1167,6 +1178,78 @@ TEST_CASE("LATM downmix preset file", "[windows][audio][latm][downmix]")
 		REQUIRE(LatmDownmix::ResolvePreset(File.Get(), L"5.1ch", &Matrix));
 		// iniの内容で完全に置き換わるので、2ch構成になる
 		CHECK(Matrix.OutputChannels.size() == 2);
+	}
+}
+
+TEST_CASE("LATM downmix output", "[windows][audio][latm][downmix]")
+{
+	LibISDB::DirectShow::AACDecoder_LATM Decoder;
+	REQUIRE(Decoder.Open());
+	LibISDB::DirectShow::AudioDecoder::DecodeFrameInfo Info;
+
+	// 合成できるのはステレオのLATMフレームまでだが、ダウンミックスの
+	// 経路そのもの (出力ch数・チャンネルマップ・無音でないこと) は確認できる
+	const auto Frame = MakeSilentLOASFrame(3, 2);
+	const auto Decode = [&]() {
+		std::size_t Size = Frame.size();
+		return Decoder.Decode(Frame.data(), &Size, &Info) && (Size == Frame.size());
+	};
+
+	SECTION("Only the supported channel counts are accepted") {
+		CHECK(Decoder.SetDownmixChannels(0));
+		CHECK(Decoder.SetDownmixChannels(2));
+		CHECK(Decoder.SetDownmixChannels(6));
+		CHECK(Decoder.SetDownmixChannels(8));
+		CHECK_FALSE(Decoder.SetDownmixChannels(1));
+		CHECK_FALSE(Decoder.SetDownmixChannels(3));
+		CHECK_FALSE(Decoder.SetDownmixChannels(24));
+	}
+
+	SECTION("The output channel count follows the setting") {
+		for (const int Channels : {2, 6, 8, 2, 0}) {
+			REQUIRE(Decoder.SetDownmixChannels(Channels));
+			REQUIRE(Decode());
+			// 0 を指定した場合は入力のチャンネル数のまま
+			CHECK(Info.Info.ChannelCount == ((Channels != 0) ? Channels : 2));
+			CHECK(Info.Info.OriginalChannelCount == 2);
+			CHECK(Info.SampleCount == 1024);
+		}
+	}
+
+	SECTION("The channel map matches the downmixed layout") {
+		int Map[6];
+		REQUIRE(Decoder.SetDownmixChannels(6));
+		REQUIRE(Decoder.GetChannelMap(6, Map));
+		CHECK(Map[LibISDB::DirectShow::AudioDecoder::CHANNEL_6_FL] == 0);
+		CHECK(Map[LibISDB::DirectShow::AudioDecoder::CHANNEL_6_FR] == 1);
+		CHECK(Map[LibISDB::DirectShow::AudioDecoder::CHANNEL_6_FC] == 2);
+		CHECK(Map[LibISDB::DirectShow::AudioDecoder::CHANNEL_6_LFE] == 3);
+		CHECK(Map[LibISDB::DirectShow::AudioDecoder::CHANNEL_6_BL] == 4);
+		CHECK(Map[LibISDB::DirectShow::AudioDecoder::CHANNEL_6_BR] == 5);
+	}
+
+	SECTION("A preset from a file is used") {
+		const TempPresetFile File(
+			"[Preset:2ch]\n"
+			"Gain=1.0\n"
+			"FL=FL\n"
+			"FR=FR\n");
+		REQUIRE(Decoder.SetDownmixChannels(2));
+		REQUIRE(Decoder.SetDownmixPreset(File.Get(), nullptr));
+		REQUIRE(Decode());
+		CHECK(Info.Info.ChannelCount == 2);
+	}
+
+	SECTION("A preset naming the wrong channel count falls back") {
+		// 2ch用の定義しかないiniを6chで使う -> 組み込みの5.1chに戻る
+		const TempPresetFile File(
+			"[Preset:5.1ch]\n"
+			"FL=FL\n"
+			"FR=FR\n");
+		REQUIRE(Decoder.SetDownmixChannels(6));
+		REQUIRE(Decoder.SetDownmixPreset(File.Get(), nullptr));
+		REQUIRE(Decode());
+		CHECK(Info.Info.ChannelCount == 6);
 	}
 }
 

@@ -34,6 +34,7 @@
 #include "AudioDecoder.hpp"
 #include "../../../../Base/DataBuffer.hpp"
 #include <vector>
+#include <memory>
 
 
 struct AVCodecContext;
@@ -44,6 +45,12 @@ struct SwrContext;
 
 namespace LibISDB::DirectShow
 {
+
+	namespace LatmDownmix
+	{
+		struct Matrix;
+	}
+
 
 	/**
 	 @brief  LATM/LOAS 伝送された AAC (ISO/IEC 14496-3, stream_type 0x11) 用デコーダ
@@ -75,6 +82,17 @@ namespace LibISDB::DirectShow
 		bool SetDownmixChannels(int Channels) override;
 
 	// AACDecoder_LATM
+		/**
+		 @brief  ダウンミックスに使うプリセットを指定する
+
+		 @param[in] pFileName   プリセットを定義した ini ファイルのパス。
+		                        nullptr や空文字列なら組み込み定義のみを使う
+		 @param[in] pPresetName 使用するプリセット名。nullptr や空文字列なら
+		                        ダウンミックス先のチャンネル数から決まる既定の
+		                        名前 ("7.1ch" / "5.1ch" / "2ch") を使う
+		*/
+		bool SetDownmixPreset(const CharType *pFileName, const CharType *pPresetName);
+
 		static void GetVersion(std::string *pVersion);
 
 	private:
@@ -82,6 +100,8 @@ namespace LibISDB::DirectShow
 		void CloseDecoder();
 		size_t FindLOASSync() const;
 		bool DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<DecodeFrameInfo> Info);
+		void ResolveMatrix();
+		bool SetSwrMatrix(SwrContext *pSwr) const;
 
 		AVCodecContext *m_pCodecContext;
 		AVPacket *m_pPacket;
@@ -92,6 +112,10 @@ namespace LibISDB::DirectShow
 		int m_DownmixChannels;
 		/** m_pSwrContext を構築した時点の m_DownmixChannels */
 		int m_SwrDownmixChannels;
+		/** ダウンミックスに使うチャンネルマトリクス。未解決なら空 */
+		std::unique_ptr<LatmDownmix::Matrix> m_Matrix;
+		String m_PresetFileName;
+		String m_PresetName;
 		std::vector<uint8_t> m_LOASBuffer;
 		DataBuffer m_PCMBuffer;
 	};
