@@ -968,6 +968,208 @@ TEST_CASE("LATM input format changes", "[windows][audio][latm]")
 	}
 }
 
+
+#include "../LibISDB/Windows/Viewer/DirectShow/AudioDecoders/LatmDownmixMatrix.hpp"
+#include <fstream>
+#include <filesystem>
+
+namespace
+{
+
+namespace LatmDownmix = LibISDB::DirectShow::LatmDownmix;
+
+// テスト用のiniファイルを書き出し、スコープを抜けたら消す
+class TempPresetFile
+{
+public:
+	explicit TempPresetFile(const char *pText, bool WithBOM = false)
+	{
+		m_Path = std::filesystem::temp_directory_path()
+			/ L"libisdbtest_LatmDownmixPresets.ini";
+		std::ofstream File(m_Path, std::ios::binary | std::ios::trunc);
+		if (WithBOM)
+			File.write("\xEF\xBB\xBF", 3);
+		File.write(pText, static_cast<std::streamsize>(std::strlen(pText)));
+	}
+
+	~TempPresetFile()
+	{
+		std::error_code ec;
+		std::filesystem::remove(m_Path, ec);
+	}
+
+	const wchar_t * Get() const { return m_Path.c_str(); }
+
+private:
+	std::filesystem::path m_Path;
+};
+
+// 出力チャンネルの並びをチャンネル名で返す
+std::vector<std::wstring> OutputChannelNames(const LatmDownmix::Matrix &Matrix)
+{
+	std::vector<std::wstring> Names;
+	for (const auto &Output : Matrix.OutputChannels) {
+		const wchar_t *pName = LatmDownmix::NameFromChannel(Output.Channel);
+		Names.push_back(pName != nullptr ? pName : L"?");
+	}
+	return Names;
+}
+
+}
+
+TEST_CASE("LATM downmix channel names", "[windows][audio][latm][downmix]")
+{
+	CHECK(LatmDownmix::ChannelFromName(L"FL") == AV_CHAN_FRONT_LEFT);
+	CHECK(LatmDownmix::ChannelFromName(L"LFE2") == AV_CHAN_LOW_FREQUENCY_2);
+	CHECK(LatmDownmix::ChannelFromName(L"BFC") == AV_CHAN_BOTTOM_FRONT_CENTER);
+
+	SECTION("Names are matched without regard to case") {
+		CHECK(LatmDownmix::ChannelFromName(L"tfl") == AV_CHAN_TOP_FRONT_LEFT);
+		CHECK(LatmDownmix::ChannelFromName(L"TfL") == AV_CHAN_TOP_FRONT_LEFT);
+	}
+
+	SECTION("Unknown names are rejected") {
+		CHECK(LatmDownmix::ChannelFromName(L"") == AV_CHAN_NONE);
+		CHECK(LatmDownmix::ChannelFromName(L"FLX") == AV_CHAN_NONE);
+		CHECK(LatmDownmix::ChannelFromName(nullptr) == AV_CHAN_NONE);
+	}
+
+	SECTION("Every name round trips") {
+		for (const wchar_t *pName : {
+				L"FL", L"FR", L"FC", L"LFE", L"BL", L"BR", L"FLC", L"FRC",
+				L"BC", L"SL", L"SR", L"TC", L"TFL", L"TFC", L"TFR", L"TBL",
+				L"TBC", L"TBR", L"LFE2", L"TSL", L"TSR", L"BFL", L"BFC", L"BFR"}) {
+			const AVChannel Channel = LatmDownmix::ChannelFromName(pName);
+			REQUIRE(Channel != AV_CHAN_NONE);
+			CHECK(std::wcscmp(LatmDownmix::NameFromChannel(Channel), pName) == 0);
+		}
+	}
+}
+
+TEST_CASE("LATM downmix builtin presets", "[windows][audio][latm][downmix]")
+{
+	LatmDownmix::Matrix Matrix;
+
+	SECTION("The output channel count follows the preset name") {
+		REQUIRE(LatmDownmix::GetBuiltinPreset(L"7.1ch", &Matrix));
+		CHECK(Matrix.OutputChannels.size() == 8);
+		CHECK(OutputChannelNames(Matrix) ==
+			std::vector<std::wstring>{L"FL", L"FR", L"FC", L"LFE", L"BL", L"BR", L"SL", L"SR"});
+
+		REQUIRE(LatmDownmix::GetBuiltinPreset(L"5.1ch", &Matrix));
+		CHECK(Matrix.OutputChannels.size() == 6);
+		CHECK(OutputChannelNames(Matrix) ==
+			std::vector<std::wstring>{L"FL", L"FR", L"FC", L"LFE", L"BL", L"BR"});
+
+		REQUIRE(LatmDownmix::GetBuiltinPreset(L"2ch", &Matrix));
+		CHECK(Matrix.OutputChannels.size() == 2);
+		CHECK(OutputChannelNames(Matrix) == std::vector<std::wstring>{L"FL", L"FR"});
+	}
+
+	SECTION("Both LFE channels reach the LFE output") {
+		REQUIRE(LatmDownmix::GetBuiltinPreset(L"5.1ch", &Matrix));
+		const auto &LFE = Matrix.OutputChannels[3];
+		REQUIRE(LFE.Channel == AV_CHAN_LOW_FREQUENCY);
+		REQUIRE(LFE.Routes.size() == 2);
+		CHECK(LFE.Routes[0].InputChannel == AV_CHAN_LOW_FREQUENCY);
+		CHECK(LFE.Routes[1].InputChannel == AV_CHAN_LOW_FREQUENCY_2);
+	}
+
+	SECTION("An unknown preset name fails") {
+		CHECK_FALSE(LatmDownmix::GetBuiltinPreset(L"9.1ch", &Matrix));
+	}
+}
+
+TEST_CASE("LATM downmix preset file", "[windows][audio][latm][downmix]")
+{
+	LatmDownmix::Matrix Matrix;
+
+	SECTION("A preset is read from the file") {
+		const TempPresetFile File(
+			"[Preset:Test2ch]\n"
+			"FL=FL:1.0,FC:0.5\n"
+			"FR=FR\n");
+		REQUIRE(LatmDownmix::LoadPresetFromFile(File.Get(), L"Test2ch", &Matrix));
+		REQUIRE(Matrix.OutputChannels.size() == 2);
+		REQUIRE(Matrix.OutputChannels[0].Routes.size() == 2);
+		CHECK(Matrix.OutputChannels[0].Routes[0].Gain == Approx(1.0f));
+		CHECK(Matrix.OutputChannels[0].Routes[1].Gain == Approx(0.5f));
+		// ゲインを省略した場合は 1.0
+		REQUIRE(Matrix.OutputChannels[1].Routes.size() == 1);
+		CHECK(Matrix.OutputChannels[1].Routes[0].Gain == Approx(1.0f));
+		// "Gain=" が無ければ既定のヘッドルーム
+		CHECK(Matrix.OutputGain == Approx(0.9f));
+	}
+
+	SECTION("Gains may be written in decibels") {
+		const TempPresetFile File(
+			"[Preset:Test2ch]\n"
+			"Gain=-6.0206dB\n"
+			"FL=FL:-3.0103dB\n"
+			"FR=FR:0dB\n");
+		REQUIRE(LatmDownmix::LoadPresetFromFile(File.Get(), L"Test2ch", &Matrix));
+		CHECK(Matrix.OutputChannels[0].Routes[0].Gain == Approx(0.707107f).epsilon(0.001));
+		CHECK(Matrix.OutputChannels[1].Routes[0].Gain == Approx(1.0f).epsilon(0.001));
+		CHECK(Matrix.OutputGain == Approx(0.5f).epsilon(0.001));
+	}
+
+	SECTION("Comments and a BOM are ignored") {
+		const TempPresetFile File(
+			"; コメント行\n"
+			"[Preset:Test2ch]\n"
+			"FL=FL  # 行末のコメント\n"
+			"FR=FR\n",
+			true);
+		REQUIRE(LatmDownmix::LoadPresetFromFile(File.Get(), L"Test2ch", &Matrix));
+		CHECK(Matrix.OutputChannels.size() == 2);
+	}
+
+	SECTION("Section names are matched without regard to case") {
+		const TempPresetFile File(
+			"[Preset:MyPreset]\n"
+			"FL=FL\n"
+			"FR=FR\n");
+		CHECK(LatmDownmix::LoadPresetFromFile(File.Get(), L"mypreset", &Matrix));
+	}
+
+	SECTION("An incomplete set of output channels is rejected") {
+		// 5.1ch とみなされるのに BL/BR が無い
+		const TempPresetFile File(
+			"[Preset:Broken]\n"
+			"FL=FL\n"
+			"FR=FR\n"
+			"FC=FC\n"
+			"LFE=LFE\n");
+		CHECK_FALSE(LatmDownmix::LoadPresetFromFile(File.Get(), L"Broken", &Matrix));
+	}
+
+	SECTION("Sections that are not presets are ignored") {
+		const TempPresetFile File(
+			"[Settings]\n"
+			"FL=FL\n"
+			"FR=FR\n");
+		CHECK_FALSE(LatmDownmix::LoadPresetFromFile(File.Get(), L"Settings", &Matrix));
+	}
+
+	SECTION("A missing file is not an error for ResolvePreset") {
+		const wchar_t *pMissing = L"\\\\?\\X:\\no_such_LatmDownmixPresets.ini";
+		CHECK_FALSE(LatmDownmix::LoadPresetFromFile(pMissing, L"5.1ch", &Matrix));
+		// 組み込み定義へフォールバックする
+		REQUIRE(LatmDownmix::ResolvePreset(pMissing, L"5.1ch", &Matrix));
+		CHECK(Matrix.OutputChannels.size() == 6);
+	}
+
+	SECTION("The file takes precedence over the builtin definition") {
+		const TempPresetFile File(
+			"[Preset:5.1ch]\n"
+			"FL=FL\n"
+			"FR=FR\n");
+		REQUIRE(LatmDownmix::ResolvePreset(File.Get(), L"5.1ch", &Matrix));
+		// iniの内容で完全に置き換わるので、2ch構成になる
+		CHECK(Matrix.OutputChannels.size() == 2);
+	}
+}
+
 #endif
 
 

@@ -36,6 +36,7 @@
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_FDK.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_FFmpeg.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_LATM.hpp" />
+    <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\LatmDownmixMatrix.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AC3Decoder.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AudioDecoder.hpp" />
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AudioDecoderFilter.hpp" />
@@ -94,6 +95,9 @@
       <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\BaseClasses\;$(SolutionDir)..\Thirdparty\ffmpeg\include\</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AACDecoder_LATM.cpp">
+      <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\BaseClasses\;$(SolutionDir)..\Thirdparty\ffmpeg\include\</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\LatmDownmixMatrix.cpp">
       <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\BaseClasses\;$(SolutionDir)..\Thirdparty\ffmpeg\include\</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AC3Decoder.cpp" />
