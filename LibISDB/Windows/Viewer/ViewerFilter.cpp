@@ -613,6 +613,15 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 
 			SetAudioDecoderType(m_AudioStreamType);
 
+			// AudioDecoderFilterは音声形式の設定後に出力ピンが確定する場合があり、
+			// AppendFilterAndConnect()で取得できないことがあるため取得し直す
+			if (!OutputAudioPin)
+				OutputAudioPin.Attach(DirectShow::GetFilterPin(m_AudioDecoder.Get(), PINDIR_OUTPUT));
+			if (!OutputAudioPin)
+				throw ErrorDescription(
+					HRESULTErrorCode(E_POINTER),
+					LIBISDB_STR("音声デコーダの出力ピンを取得できません。"));
+
 			m_AudioDecoder->AddEventListener(this);
 			m_AudioDecoder->SetJitterCorrection(m_AdjustAudioStreamTime);
 			if (m_pAudioSampleCallback)
@@ -1909,9 +1918,13 @@ bool ViewerFilter::SetAdjustAudioStreamTime(bool Adjust)
 
 bool ViewerFilter::SetAudioSampleCallback(DirectShow::AudioDecoderFilter::SampleCallback *pCallback)
 {
+	// AudioDecoderFilter::SetSampleCallback() はコールバックを呼び出す
+	// ProcessPCM() と同じロックで直列化されるため、先にデコーダ側を更新して
+	// 実行中のコールバックが終わるのを待つ。こうすることで、呼び出し元は
+	// この関数から戻った後にコールバックのオブジェクトを破棄できる。
+	if (m_AudioDecoder && !m_AudioDecoder->SetSampleCallback(pCallback))
+		return false;
 	m_pAudioSampleCallback = pCallback;
-	if (m_AudioDecoder)
-		return m_AudioDecoder->SetSampleCallback(pCallback);
 	return true;
 }
 
