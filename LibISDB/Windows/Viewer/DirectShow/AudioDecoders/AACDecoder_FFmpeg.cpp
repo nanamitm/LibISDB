@@ -308,7 +308,7 @@ bool AACDecoder_FFmpeg::DecodeFrame(const ADTSFrame *pFrame, ReturnArg<DecodeFra
 }
 
 
-#endif // LIBISDB_HAS_FFMPEG_AAC
-
-
 } // namespace LibISDB::DirectShow
+
+
+#endif // LIBISDB_HAS_FFMPEG_AAC

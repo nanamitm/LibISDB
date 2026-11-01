@@ -526,7 +526,7 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 }
 
 
-#endif // LIBISDB_HAS_FFMPEG_AAC
-
-
 } // namespace LibISDB::DirectShow
+
+
+#endif // LIBISDB_HAS_FFMPEG_AAC
