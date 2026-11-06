@@ -27,6 +27,7 @@
 #include "../../../../LibISDBPrivate.hpp"
 #include "../../../../LibISDBWindows.hpp"
 #include "AudioDecoderFilter.hpp"
+#include "MpcSpatialAudio.hpp"
 #include "AACDecoder_FAAD2.hpp"
 #ifdef LIBISDB_HAS_FDK_AAC
 #include "AACDecoder_FDK.hpp"
@@ -267,7 +268,8 @@ HRESULT AudioDecoderFilter::CheckTransform(const CMediaType *mtIn, const CMediaT
 	CheckPointer(mtOut, E_POINTER);
 
 	if (*mtOut->Type() == MEDIATYPE_Audio) {
-		if (*mtOut->Subtype() == MEDIASUBTYPE_PCM) {
+		if (*mtOut->Subtype() == MEDIASUBTYPE_PCM
+				|| (m_Mpc22Point2Output && MpcSpatialAudio::IsMediaType(*mtOut))) {
 
 			// GUID_NULLではデバッグアサートが発生するのでダミーを設定して回避
 			CMediaType MediaType;
@@ -495,6 +497,10 @@ HRESULT AudioDecoderFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 				break;
 			}
 
+			if (static_cast<size_t>(pOutSample->GetSize()) < m_OutData.GetSize()) {
+				pOutSample->Release();
+				return VFW_E_BUFFER_OVERFLOW;
+			}
 			std::memcpy(pOutBuff, m_OutData.GetData(), m_OutData.GetSize());
 			pOutSample->SetActualDataLength(static_cast<long>(m_OutData.GetSize()));
 
@@ -614,6 +620,14 @@ bool AudioDecoderFilter::SetDecoderType(DecoderType Type)
 	m_DecoderType = Type;
 
 	return true;
+}
+
+
+void AudioDecoderFilter::SetMpc22Point2Output(bool Enable)
+{
+ CAutoLock AutoLock(&m_cPropLock);
+ m_Mpc22Point2Output = Enable;
+ if (m_Decoder) m_Decoder->SetMpc22Point2Output(Enable);
 }
 
 
@@ -955,6 +969,8 @@ HRESULT AudioDecoderFilter::ProcessPCM(
 	const bool Surround7Point1 = (Info.ChannelCount == ChannelCount_7Point1);
 	// 22.2ch は放送から渡された 24ch をそのまま出力する
 	const bool Broadcast22Point2 = (Info.ChannelCount == ChannelCount_22Point2);
+	const bool Mpc22Point2 = Broadcast22Point2 && m_Mpc22Point2Output && Info.Mpc22Point2;
+	const GUID &Subtype = Mpc22Point2 ? MpcSpatialAudio::MediaSubtype : MEDIASUBTYPE_PCM;
 	const bool ExtendedFormat = Surround || Surround7Point1 || Broadcast22Point2;
 	const int OutChannels =
 		Broadcast22Point2 ? ChannelCount_22Point2 :
@@ -963,14 +979,15 @@ HRESULT AudioDecoderFilter::ProcessPCM(
 
 	// メディアタイプの更新
 	WAVEFORMATEX *pwfx = reinterpret_cast<WAVEFORMATEX *>(m_MediaType.Format());
-	if ((*m_MediaType.FormatType() != FORMAT_WaveFormatEx)
+	if ((*m_MediaType.Subtype() != Subtype)
+			|| (*m_MediaType.FormatType() != FORMAT_WaveFormatEx)
 			|| (!ExtendedFormat && (pwfx->wFormatTag != WAVE_FORMAT_PCM))
 			|| (ExtendedFormat && (pwfx->wFormatTag != WAVE_FORMAT_EXTENSIBLE))
 			|| (pwfx->nChannels != OutChannels)
 			|| (pwfx->nSamplesPerSec != Info.Frequency)) {
 		CMediaType &mt = pSampleInfo->MediaType;
 		mt.SetType(&MEDIATYPE_Audio);
-		mt.SetSubtype(&MEDIASUBTYPE_PCM);
+		mt.SetSubtype(&Subtype);
 		mt.SetFormatType(&FORMAT_WaveFormatEx);
 
 		pwfx = reinterpret_cast<WAVEFORMATEX *>(
@@ -1009,7 +1026,7 @@ HRESULT AudioDecoderFilter::ProcessPCM(
 		mt.SetSampleSize(pwfx->nBlockAlign);
 
 		pSampleInfo->MediaTypeChanged = true;
-		pSampleInfo->MediaBufferSize = SAMPLES_PER_FRAME * pwfx->nBlockAlign;
+		pSampleInfo->MediaBufferSize = static_cast<long>(std::max<size_t>(SAMPLES_PER_FRAME, Samples) * pwfx->nBlockAlign);
 	}
 
 	const size_t BuffSize = Samples * OutChannels * sizeof(int16_t);
@@ -1564,6 +1581,7 @@ AudioDecoder * AudioDecoderFilter::CreateDecoder(DecoderType Type)
 	// デコーダを作り直した場合も設定が引き継がれるようにする
 	if (pDecoder != nullptr) {
 		ApplyLatmDownmixPreset(pDecoder);
+		pDecoder->SetMpc22Point2Output(m_Mpc22Point2Output);
 		pDecoder->SetDownmixChannels(m_LatmDownmixChannels);
 	}
 

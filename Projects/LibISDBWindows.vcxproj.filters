@@ -165,6 +165,9 @@
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AC3Decoder.hpp">
       <Filter>Viewer\DirectShow\AudioDecoders\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\MpcSpatialAudio.hpp">
+      <Filter>Viewer\DirectShow\AudioDecoders\Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\LibISDB\Windows\Viewer\DirectShow\AudioDecoders\AudioDecoder.hpp">
       <Filter>Viewer\DirectShow\AudioDecoders\Header Files</Filter>
     </ClInclude>

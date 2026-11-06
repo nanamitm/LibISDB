@@ -27,6 +27,7 @@
 #include "../../LibISDBPrivate.hpp"
 #include "../../LibISDBWindows.hpp"
 #include "ViewerFilter.hpp"
+#include "DirectShow/AudioDecoders/MpcSpatialAudio.hpp"
 #include "DirectShow/SourceFilter/TSSourceFilter.hpp"
 #include "DirectShow/VideoParsers/MPEG2ParserFilter.hpp"
 #include "DirectShow/VideoParsers/H264ParserFilter.hpp"
@@ -750,7 +751,12 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 			// Null レンダラが指定された場合は音声デバイスを選択せず、
 			// 下の Null レンダラ接続へ流す
 			if (!Settings.UseNullAudioRenderer) {
-				if (!Settings.AudioDevice.MonikerName.empty()) {
+				if (Settings.AudioRendererFilter) {
+					m_AudioRenderer = Settings.AudioRendererFilter;
+					m_AudioRendererName = LIBISDB_STR("Application audio renderer");
+					OK = true;
+				}
+				if (!OK && !Settings.AudioDevice.MonikerName.empty()) {
 					hr = DirectShow::CreateFilterFromMonikerName(
 						Settings.AudioDevice.MonikerName.c_str(), &m_AudioRenderer, &m_AudioRendererName);
 					if (SUCCEEDED(hr)) {
@@ -782,6 +788,12 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 			}
 
 			if (OK) {
+				const bool MpcSpatial = Settings.EnableMpcSpatialAudio && Settings.AudioFilterList.empty()
+					&& DirectShow::MpcSpatialAudio::IsSupported(m_AudioRenderer.Get());
+				if (MpcSpatial) {
+					m_AudioDecoder->SetMpc22Point2Output(true);
+					m_AudioDecoder->SetLatmDownmixChannels(0);
+				}
 				hr = DirectShow::AppendFilterAndConnect(
 					m_GraphBuilder.Get(), m_AudioRenderer.Get(), L"Audio Renderer", &OutputAudioPin);
 				if (SUCCEEDED(hr)) {
@@ -807,6 +819,10 @@ bool ViewerFilter::OpenViewer(const OpenSettings &Settings)
 					OK = false;
 				}
 				if (!OK) {
+					if (MpcSpatial) {
+						m_AudioDecoder->SetMpc22Point2Output(false);
+						m_AudioDecoder->SetLatmDownmixChannels(Settings.LatmDownmixChannels);
+					}
 					hr = m_GraphBuilder->Render(OutputAudioPin.Get());
 					if (FAILED(hr)) {
 						throw ErrorDescription(

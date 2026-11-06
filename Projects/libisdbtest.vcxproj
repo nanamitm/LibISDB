@@ -233,12 +233,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Tests\libisdbtest.cpp">
-      <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\Thirdparty\ffmpeg\include\;$(SolutionDir)..\Thirdparty\BaseClasses\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
     <Link>
-      <AdditionalDependencies>LibISDBWindows.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>LibISDBWindows.lib;shlwapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(LibISDBFFmpegLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>

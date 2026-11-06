@@ -40,6 +40,7 @@
 struct AVCodecContext;
 struct AVPacket;
 struct AVFrame;
+struct AVChannelLayout;
 struct SwrContext;
 
 
@@ -80,6 +81,7 @@ namespace LibISDB::DirectShow
 		bool GetChannelMap(int Channels, int *pMap) const override;
 		bool GetDownmixInfo(ReturnArg<DownmixInfo> Info) const override;
 		bool SetDownmixChannels(int Channels) override;
+		void SetMpc22Point2Output(bool Enable) override;
 
 	// AACDecoder_LATM
 		/**
@@ -95,13 +97,16 @@ namespace LibISDB::DirectShow
 
 		static void GetVersion(std::string *pVersion);
 
+	protected:
+		bool ConvertFrame(const AVFrame *pFrame, ReturnArg<DecodeFrameInfo> Info);
+
 	private:
 		bool OpenDecoder();
 		void CloseDecoder();
 		size_t FindLOASSync() const;
 		bool DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<DecodeFrameInfo> Info);
 		void ResolveMatrix();
-		bool SetSwrMatrix(SwrContext *pSwr) const;
+		bool SetSwrMatrix(SwrContext *pSwr, const AVChannelLayout &InputLayout) const;
 
 		AVCodecContext *m_pCodecContext;
 		AVPacket *m_pPacket;
@@ -112,6 +117,7 @@ namespace LibISDB::DirectShow
 		int m_DownmixChannels;
 		/** m_pSwrContext を構築した時点の m_DownmixChannels */
 		int m_SwrDownmixChannels;
+		bool m_Mpc22Point2Output = false;
 		/** ダウンミックスに使うチャンネルマトリクス。未解決なら空 */
 		std::unique_ptr<LatmDownmix::Matrix> m_Matrix;
 		String m_PresetFileName;

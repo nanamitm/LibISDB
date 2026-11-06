@@ -145,6 +145,7 @@ namespace LibISDB::DirectShow
 		 (24ch を解釈できる出力先が繋がっている場合にのみ使用する)。
 		*/
 		bool SetLatmDownmixChannels(int Channels);
+		void SetMpc22Point2Output(bool Enable);
 		int GetLatmDownmixChannels() const noexcept { return m_LatmDownmixChannels; }
 		/**
 		 ダウンミックスに使うプリセットを指定する。
@@ -226,6 +227,7 @@ namespace LibISDB::DirectShow
 		DecoderType m_DecoderType;
 		/** LATM 音声のダウンミックス先。既定では通常の音声レンダラへ出せるステレオ */
 		int m_LatmDownmixChannels = 2;
+		bool m_Mpc22Point2Output = false;
 		String m_LatmDownmixPresetFileName;
 		String m_LatmDownmixPresetName;
 		std::unique_ptr<AudioDecoder> m_Decoder;

@@ -75,9 +75,14 @@ namespace LibISDB
 			uint8_t VideoStreamType = STREAM_TYPE_INVALID;
 			LPCWSTR pszVideoDecoder = nullptr;
 			DirectShow::FilterInfo AudioDevice;
+			/** Optional pre-created renderer, preferred over AudioDevice. */
+			COMPointer<IBaseFilter> AudioRendererFilter;
 			/** 音声デコーダの出力を Null レンダラへ接続し、音声は
 			    SetAudioSampleCallback() のコールバックで受け取る */
 			bool UseNullAudioRenderer = false;
+			/** Auto-detect the selected MPC renderer and send canonical 24ch PCM.
+			    Disabled when Null or intermediate audio filters are selected. */
+			bool EnableMpcSpatialAudio = true;
 			/** 22.2ch 音声のダウンミックス先チャンネル数 (2 / 6 / 8)。
 			    UseNullAudioRenderer の場合はダウンミックスせず 24ch のまま出力する */
 			int LatmDownmixChannels = 2;
