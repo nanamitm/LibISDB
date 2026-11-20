@@ -969,6 +969,174 @@ TEST_CASE("LATM input format changes", "[windows][audio][latm]")
 }
 
 
+#include "../LibISDB/Windows/Viewer/DirectShow/AudioDecoders/MpcSpatialAudio.hpp"
+#include "../LibISDB/Windows/Viewer/ViewerFilter.hpp"
+extern "C" {
+#include <libavutil/frame.h>
+}
+
+namespace {
+class SpatialTestDecoder : public LibISDB::DirectShow::AACDecoder_LATM {
+public:
+ using AACDecoder_LATM::ConvertFrame;
+};
+struct DecodedFrame {
+ AVFrame* Frame = av_frame_alloc();
+ DecodedFrame(int Rate = 48000, bool Reverse = false, int Samples = 256) {
+  REQUIRE(Frame != nullptr);
+  const AVChannelLayout Canonical = AV_CHANNEL_LAYOUT_22POINT2;
+  if (Reverse) {
+   REQUIRE(av_channel_layout_custom_init(&Frame->ch_layout, 24) == 0);
+   for (int i = 0; i < 24; i++)
+    Frame->ch_layout.u.map[i].id = av_channel_layout_channel_from_index(&Canonical, 23-i);
+  } else {
+   REQUIRE(av_channel_layout_copy(&Frame->ch_layout, &Canonical) == 0);
+  }
+  Frame->format = AV_SAMPLE_FMT_FLTP;
+  Frame->sample_rate = Rate;
+  Frame->nb_samples = Samples;
+  REQUIRE(av_frame_get_buffer(Frame, 0) == 0);
+  for (int i = 0; i < 24; i++) {
+   const float Value = float((Reverse ? 23-i : i)+1) / 32.0f;
+   std::fill_n(reinterpret_cast<float*>(Frame->extended_data[i]), Samples, Value);
+  }
+ }
+ ~DecodedFrame() { av_frame_free(&Frame); }
+};
+}
+
+TEST_CASE("MPC spatial canonical channel transport", "[windows][audio][latm][spatial]")
+{
+ SpatialTestDecoder Decoder;
+ REQUIRE(Decoder.Open());
+ Decoder.SetMpc22Point2Output(true);
+ LibISDB::DirectShow::AudioDecoder::DecodeFrameInfo Output;
+ SECTION("Custom input order is remapped by speaker identity") {
+  DecodedFrame Input(48000, true);
+  REQUIRE(Decoder.ConvertFrame(Input.Frame, &Output));
+  REQUIRE(Output.Info.Mpc22Point2);
+  REQUIRE(Output.Info.ChannelCount == 24);
+  REQUIRE(Output.SampleCount == 256);
+  const auto* PCM = reinterpret_cast<const int16_t*>(Output.pData);
+  for (size_t n = 0; n < Output.SampleCount; n++)
+   for (int ch = 0; ch < 24; ch++) CHECK(PCM[n*24+ch] == (ch+1)*1024);
+ }
+ SECTION("A switch to stereo clears the 24ch transport flag") {
+  DecodedFrame Input;
+  REQUIRE(Decoder.ConvertFrame(Input.Frame, &Output));
+  REQUIRE(Output.Info.Mpc22Point2);
+  const auto Stereo = MakeSilentLOASFrame();
+  size_t Size = Stereo.size();
+  REQUIRE(Decoder.Decode(Stereo.data(), &Size, &Output));
+  CHECK(Output.Info.ChannelCount == 2);
+  CHECK_FALSE(Output.Info.Mpc22Point2);
+  REQUIRE(Decoder.ConvertFrame(Input.Frame, &Output));
+  CHECK(Output.Info.Mpc22Point2);
+ }
+ SECTION("Unspecified speaker identities are never labelled as canonical") {
+  DecodedFrame Input(48000, true);
+  Input.Frame->ch_layout.u.map[0].id = AV_CHAN_UNKNOWN;
+  CHECK_FALSE(Decoder.ConvertFrame(Input.Frame, &Output));
+ }
+ SECTION("44.1kHz is converted to the renderer's fixed 48kHz") {
+  DecodedFrame Input(44100);
+  REQUIRE(Decoder.ConvertFrame(Input.Frame, &Output));
+  CHECK(Output.Info.Mpc22Point2);
+  CHECK(Output.Info.Frequency == 48000);
+  CHECK(Output.SampleCount > 256);
+ }
+ SECTION("Upsampling allocates beyond the original per-frame sample count") {
+  DecodedFrame Input(8000, false, 4096);
+  REQUIRE(Decoder.ConvertFrame(Input.Frame, &Output));
+  CHECK(Output.Info.Mpc22Point2);
+  CHECK(Output.Info.Frequency == 48000);
+  CHECK(Output.SampleCount > 4096);
+ }
+ SECTION("Null renderer raw output keeps the existing order and rate") {
+  Decoder.SetMpc22Point2Output(false);
+  DecodedFrame Input(44100, true);
+  REQUIRE(Decoder.ConvertFrame(Input.Frame, &Output));
+  CHECK_FALSE(Output.Info.Mpc22Point2);
+  CHECK(Output.Info.Frequency == 44100);
+  CHECK(reinterpret_cast<const int16_t*>(Output.pData)[0] == 24*1024);
+ }
+ SECTION("Configured downmix is retained outside the raw transport") {
+  REQUIRE(Decoder.SetDownmixChannels(6));
+  DecodedFrame Input;
+  REQUIRE(Decoder.ConvertFrame(Input.Frame, &Output));
+  CHECK_FALSE(Output.Info.Mpc22Point2);
+  CHECK(Output.Info.ChannelCount == 6);
+  // Each speaker, including LFE2, top and bottom layers must reach the mix.
+  for (int ch = 0; ch < 24; ch++) {
+   for (int i = 0; i < 24; i++)
+    std::fill_n(reinterpret_cast<float*>(Input.Frame->extended_data[i]), 256, i == ch ? 0.125f : 0.f);
+   REQUIRE(Decoder.ConvertFrame(Input.Frame, &Output));
+   const auto* PCM = reinterpret_cast<const int16_t*>(Output.pData);
+   int Sum = 0;
+   for (int out = 0; out < 6; out++) Sum += std::abs(PCM[out]);
+   INFO("input speaker " << ch);
+   CHECK(Sum > 0);
+  }
+ }
+}
+
+TEST_CASE("MPC spatial renderer auto detection", "[windows][audio][spatial][integration]")
+{
+ wchar_t Path[32768];
+ if (!GetEnvironmentVariableW(L"LIBISDB_TEST_MPC_RENDERER", Path, 32768)) {
+  WARN("Set LIBISDB_TEST_MPC_RENDERER to the spatial AX to exercise the actual graph");
+  return;
+ }
+ const HRESULT Com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+ REQUIRE(SUCCEEDED(Com));
+ HMODULE Module = LoadLibraryW(Path);
+ REQUIRE(Module != nullptr);
+ {
+  using FactoryProc = HRESULT (STDAPICALLTYPE*)(REFCLSID, REFIID, void**);
+  auto Factory = reinterpret_cast<FactoryProc>(GetProcAddress(Module, "DllGetClassObject"));
+  REQUIRE(Factory != nullptr);
+  const CLSID RendererClass = {0x54c37e17,0xbe59,0x4adb,{0xb3,0x38,0xd2,0xf0,0x4b,0xd2,0xa0,0xa5}};
+  LibISDB::COMPointer<IClassFactory> ClassFactory;
+  REQUIRE(SUCCEEDED(Factory(RendererClass, IID_PPV_ARGS(ClassFactory.GetPP()))));
+  for (int Mode : {0, 1, 2}) {
+   const bool Enable = Mode == 0;
+   LibISDB::ViewerFilter Viewer;
+   LibISDB::ViewerFilter::OpenSettings Settings{};
+   Settings.VideoStreamType = LibISDB::STREAM_TYPE_INVALID;
+   Settings.EnableMpcSpatialAudio = Enable;
+   Settings.UseNullAudioRenderer = Mode == 2;
+   REQUIRE(SUCCEEDED(ClassFactory->CreateInstance(nullptr, IID_PPV_ARGS(Settings.AudioRendererFilter.GetPP()))));
+   CHECK(LibISDB::DirectShow::MpcSpatialAudio::IsSupported(Settings.AudioRendererFilter.Get()));
+   REQUIRE(Viewer.OpenViewer(Settings));
+   auto Decoder = Viewer.GetAudioDecoderFilter();
+   CHECK(Decoder->GetLatmDownmixChannels() == (Mode != 1 ? 0 : 2));
+   CMediaType Type, InputType;
+   Type.SetType(&MEDIATYPE_Audio);
+   Type.SetSubtype(&LibISDB::DirectShow::MpcSpatialAudio::MediaSubtype);
+   Type.SetFormatType(&FORMAT_WaveFormatEx);
+   WAVEFORMATEXTENSIBLE W{};
+   W.Format = {WAVE_FORMAT_EXTENSIBLE,24,48000,48000*48,48,16,22};
+   W.Samples.wValidBitsPerSample = 16;
+   W.SubFormat = MEDIASUBTYPE_PCM;
+   Type.SetFormat(reinterpret_cast<BYTE*>(&W), sizeof(W));
+   CHECK(LibISDB::DirectShow::MpcSpatialAudio::IsMediaType(Type));
+   CHECK(Decoder->CheckTransform(&InputType, &Type) == (Enable ? S_OK : VFW_E_TYPE_NOT_ACCEPTED));
+   LibISDB::COMPointer<IEnumPins> Pins;
+   REQUIRE(SUCCEEDED(Settings.AudioRendererFilter->EnumPins(Pins.GetPP())));
+   LibISDB::COMPointer<IPin> Pin;
+   REQUIRE(Pins->Next(1, Pin.GetPP(), nullptr) == S_OK);
+   CHECK(Pin->QueryAccept(&Type) == S_OK);
+   W.dwChannelMask = 3;
+   Type.SetFormat(reinterpret_cast<BYTE*>(&W), sizeof(W));
+   CHECK_FALSE(LibISDB::DirectShow::MpcSpatialAudio::IsMediaType(Type));
+   CHECK(Decoder->CheckTransform(&InputType, &Type) == VFW_E_TYPE_NOT_ACCEPTED);
+   Viewer.CloseViewer();
+  }
+ }
+ FreeLibrary(Module);
+ CoUninitialize();
+}
+
 #include "../LibISDB/Windows/Viewer/DirectShow/AudioDecoders/LatmDownmixMatrix.hpp"
 #include <fstream>
 #include <filesystem>

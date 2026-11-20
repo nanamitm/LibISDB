@@ -169,6 +169,15 @@ bool AACDecoder_LATM::GetChannelMap(int Channels, int *pMap) const
 }
 
 
+void AACDecoder_LATM::SetMpc22Point2Output(bool Enable)
+{
+ if (m_Mpc22Point2Output != Enable) {
+  m_Mpc22Point2Output = Enable;
+  ::swr_free(&m_pSwrContext);
+ }
+}
+
+
 bool AACDecoder_LATM::SetDownmixChannels(int Channels)
 {
 	if ((Channels != 0) && (Channels != 2) && (Channels != 6) && (Channels != 8))
@@ -235,12 +244,12 @@ void AACDecoder_LATM::ResolveMatrix()
 }
 
 
-bool AACDecoder_LATM::SetSwrMatrix(SwrContext *pSwr) const
+bool AACDecoder_LATM::SetSwrMatrix(SwrContext *pSwr, const AVChannelLayout &InputLayout) const
 {
 	if (!m_Matrix)
 		return false;
 
-	const int InChannels = m_pFrame->ch_layout.nb_channels;
+	const int InChannels = InputLayout.nb_channels;
 	const size_t OutChannels = m_Matrix->OutputChannels.size();
 	if ((InChannels <= 0) || (OutChannels == 0))
 		return false;
@@ -252,7 +261,7 @@ bool AACDecoder_LATM::SetSwrMatrix(SwrContext *pSwr) const
 	for (size_t i = 0; i < OutChannels; i++) {
 		for (const LatmDownmix::Route &Route : m_Matrix->OutputChannels[i].Routes) {
 			const int Index = ::av_channel_layout_index_from_channel(
-				&m_pFrame->ch_layout, Route.InputChannel);
+				&InputLayout, Route.InputChannel);
 			if (Index >= 0) {
 				Coefficients[i * static_cast<size_t>(InChannels) + static_cast<size_t>(Index)] +=
 					static_cast<double>(Route.Gain) * static_cast<double>(m_Matrix->OutputGain);
@@ -424,17 +433,34 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 		return false;
 	}
 
-	const int SrcChannels = m_pFrame->ch_layout.nb_channels;
-	const int SampleRate = m_pFrame->sample_rate;
+	return ConvertFrame(m_pFrame, Info);
+}
 
-	if ((SrcChannels <= 0) || (SampleRate <= 0))
+
+bool AACDecoder_LATM::ConvertFrame(const AVFrame *pFrame, ReturnArg<DecodeFrameInfo> Info)
+{
+	int Ret = 0;
+	const int SrcChannels = pFrame->ch_layout.nb_channels;
+	const int SampleRate = pFrame->sample_rate;
+
+	if ((SrcChannels <= 0) || (SampleRate <= 0) || pFrame->nb_samples <= 0)
 		return false;
 
+	const bool Mpc22Point2 = m_Mpc22Point2Output && m_DownmixChannels == 0 && SrcChannels == 24;
+	const int OutputRate = Mpc22Point2 ? 48000 : SampleRate;
+	if (Mpc22Point2) {
+		const AVChannelLayout Canonical = AV_CHANNEL_LAYOUT_22POINT2;
+		for (int i = 0; i < Canonical.nb_channels; i++) {
+			const AVChannel Channel = ::av_channel_layout_channel_from_index(&Canonical, i);
+			if (::av_channel_layout_index_from_channel(&pFrame->ch_layout, Channel) < 0)
+				return false;
+		}
+	}
 	if ((m_pSwrContext == nullptr)
 			|| (m_SwrDownmixChannels != m_DownmixChannels)
 			|| (m_pSwrInputFormat->sample_rate != SampleRate)
-			|| (m_pSwrInputFormat->format != m_pFrame->format)
-			|| (::av_channel_layout_compare(&m_pSwrInputFormat->ch_layout, &m_pFrame->ch_layout) != 0)) {
+			|| (m_pSwrInputFormat->format != pFrame->format)
+			|| (::av_channel_layout_compare(&m_pSwrInputFormat->ch_layout, &pFrame->ch_layout) != 0)) {
 		::swr_free(&m_pSwrContext);
 
 		// ダウンミックスしない場合、出力のチャンネル順序はデコーダから
@@ -461,7 +487,12 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 			}
 			break;
 		default:
-			Ret = ::av_channel_layout_copy(&OutLayout, &m_pFrame->ch_layout);
+			if (Mpc22Point2) {
+				const AVChannelLayout Canonical = AV_CHANNEL_LAYOUT_22POINT2;
+				Ret = ::av_channel_layout_copy(&OutLayout, &Canonical);
+			} else {
+				Ret = ::av_channel_layout_copy(&OutLayout, &pFrame->ch_layout);
+			}
 			break;
 		}
 		if (Ret < 0)
@@ -470,14 +501,16 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 		SwrContext *pSwr = nullptr;
 		Ret = ::swr_alloc_set_opts2(
 			&pSwr,
-			&OutLayout, AV_SAMPLE_FMT_S16, SampleRate,
-			&m_pFrame->ch_layout, static_cast<AVSampleFormat>(m_pFrame->format), SampleRate,
+			&OutLayout, AV_SAMPLE_FMT_S16, OutputRate,
+			&pFrame->ch_layout, static_cast<AVSampleFormat>(pFrame->format), SampleRate,
 			0, nullptr);
+
+		::av_channel_layout_uninit(&OutLayout);
 
 		// 係数行列は swr_init() より前に設定する必要がある。マトリクスが
 		// 無い場合は libswresample の既定のダウンミックスがそのまま使われる
 		if ((Ret >= 0) && (pSwr != nullptr) && (m_DownmixChannels != 0))
-			SetSwrMatrix(pSwr);
+			SetSwrMatrix(pSwr, pFrame->ch_layout);
 
 		if ((Ret < 0) || (pSwr == nullptr) || (::swr_init(pSwr) < 0)) {
 			if (pSwr != nullptr)
@@ -486,19 +519,21 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 		}
 
 		::av_channel_layout_uninit(&m_pSwrInputFormat->ch_layout);
-		if (::av_channel_layout_copy(&m_pSwrInputFormat->ch_layout, &m_pFrame->ch_layout) < 0) {
+		if (::av_channel_layout_copy(&m_pSwrInputFormat->ch_layout, &pFrame->ch_layout) < 0) {
 			::swr_free(&pSwr);
 			return false;
 		}
 		m_pSwrInputFormat->sample_rate = SampleRate;
-		m_pSwrInputFormat->format = m_pFrame->format;
+		m_pSwrInputFormat->format = pFrame->format;
 		m_pSwrContext = pSwr;
 		m_SwrDownmixChannels = m_DownmixChannels;
 	}
 
 	const int OutChannels = (m_DownmixChannels != 0) ? m_DownmixChannels : SrcChannels;
+	const int Capacity = ::swr_get_out_samples(m_pSwrContext, pFrame->nb_samples);
+	if (Capacity <= 0) return false;
 	const size_t RequiredSize =
-		static_cast<size_t>(OutChannels) * sizeof(int16_t) * static_cast<size_t>(m_pFrame->nb_samples);
+		static_cast<size_t>(OutChannels) * sizeof(int16_t) * static_cast<size_t>(Capacity);
 	if (m_PCMBuffer.GetBufferSize() < RequiredSize) {
 		if (m_PCMBuffer.AllocateBuffer(RequiredSize) < RequiredSize)
 			return false;
@@ -507,12 +542,13 @@ bool AACDecoder_LATM::DecodePacket(const uint8_t *pData, size_t Size, ReturnArg<
 	uint8_t *pOut = m_PCMBuffer.GetBuffer();
 	const int Converted = ::swr_convert(
 		m_pSwrContext,
-		&pOut, m_pFrame->nb_samples,
-		const_cast<const uint8_t **>(m_pFrame->extended_data), m_pFrame->nb_samples);
+		&pOut, Capacity,
+		const_cast<const uint8_t **>(pFrame->extended_data), pFrame->nb_samples);
 	if (Converted < 0)
 		return false;
 
-	m_AudioInfo.Frequency = SampleRate;
+	m_AudioInfo.Frequency = OutputRate;
+	m_AudioInfo.Mpc22Point2 = Mpc22Point2;
 	m_AudioInfo.ChannelCount = OutChannels;
 	m_AudioInfo.OriginalChannelCount = SrcChannels;
 	m_AudioInfo.DualMono = false;

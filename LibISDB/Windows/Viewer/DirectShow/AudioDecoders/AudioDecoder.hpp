@@ -53,6 +53,8 @@ namespace LibISDB::DirectShow
 			int ChannelCount = 0;
 			int OriginalChannelCount = 0;
 			bool DualMono = false;
+			/** Canonical MPC 22.2ch PCM16/48kHz transport, not unspecified raw PCM. */
+			bool Mpc22Point2 = false;
 		};
 
 		struct DecodeFrameInfo {
@@ -100,6 +102,7 @@ namespace LibISDB::DirectShow
 		 @return 対応しているデコーダで設定できた場合 true
 		*/
 		virtual bool SetDownmixChannels(int Channels) { return false; }
+		virtual void SetMpc22Point2Output(bool Enable) {}
 
 		/**
 		 @brief  ダウンミックスに使うプリセットを指定する
