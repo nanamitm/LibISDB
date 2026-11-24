@@ -1,9 +1,9 @@
-This directory vendors static FFmpeg 9.0.1 (x64-windows) libraries and
+This directory vendors static FFmpeg 9.1 (x64-windows) libraries and
 headers, limited to the avcodec, avutil, and swresample components used
 by AACDecoder_FFmpeg / AACDecoder_LATM. The libraries are linked into the
 executable, so no FFmpeg DLLs are needed at run time.
 
-FFmpeg source for this version: https://github.com/FFmpeg/FFmpeg/releases/tag/n9.0.1
+FFmpeg source for this version: https://github.com/FFmpeg/FFmpeg/releases/tag/n9.1
 
 Build: build_static_msvc.cmd (build_static_msvc.sh) in this directory,
 with Visual Studio 2022 (v143) and MSYS (bash, make, nasm). Only the aac
@@ -20,9 +20,9 @@ Public License (LGPL) version 2.1 or later. No additional codec libraries
 (x264, x265, fdk-aac, etc.) are linked in.
 
 Bundled library versions:
-- libavcodec 63.1.101
-- libavutil 61.1.101
-- libswresample 7.1.101
+- libavcodec 63.24.100
+- libavutil 61.19.100
+- libswresample 7.6.100
 
 License text: COPYING.LGPLv2.1 (this directory)
 FFmpeg source and legal info: https://ffmpeg.org/legal.html
